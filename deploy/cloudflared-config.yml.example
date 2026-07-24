@@ -1,0 +1,12 @@
+# Copier en cloudflared-config.yml après avoir créé le tunnel (voir install_services.ps1
+# étape 3). Remplacer <TUNNEL_ID> par l'identifiant retourné par `cloudflared tunnel create`.
+# Chemin du credentials-file : celui affiché après la création du tunnel
+# (généralement C:\Users\<utilisateur>\.cloudflared\<TUNNEL_ID>.json).
+
+tunnel: <TUNNEL_ID>
+credentials-file: C:\Users\<utilisateur>\.cloudflared\<TUNNEL_ID>.json
+
+ingress:
+  - hostname: frpsno.com
+    service: http://127.0.0.1:8000
+  - service: http_status:404

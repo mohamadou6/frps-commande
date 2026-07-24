@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Paiement - Commande FRPS{% endblock %}
+{% block content %}
+<h1 class="h4 mb-3">Paiement de la commande #{{ commande.id }}</h1>
+<p>Montant à payer : <strong>{{ commande.montant_total }} FCFA</strong></p>
+
+{% if not paiement %}
+<div class="row g-3">
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-body d-flex flex-column">
+                <h2 class="h5">Payer par Orange Money</h2>
+                <p>Envoyez <strong>{{ commande.montant_total }} FCFA</strong> au compte Orange Money du FRPS :</p>
+                <p class="fs-4 fw-bold">{{ orange_money_compte }}</p>
+                <form method="post" action="{% url 'paiements:initier' commande.id %}" class="mt-auto">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-primary w-100">Continuer</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-body d-flex flex-column">
+                <h2 class="h5">Payer en espèces</h2>
+                <p>La commande sera réglée en espèces (au comptoir ou à la livraison). Aucune autre étape n'est nécessaire : la commande est validée immédiatement.</p>
+                <form method="post" action="{% url 'paiements:payer_especes' commande.id %}" class="mt-auto">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-success w-100">Valider en espèces</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% elif paiement.statut == "en_attente" %}
+<div class="alert alert-info">
+    Paiement initié (référence {{ paiement.reference_transaction }}). En attente de confirmation Orange Money.
+</div>
+<form method="post" action="{% url 'paiements:confirmer_mock' commande.id %}">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-success">Simuler la confirmation du paiement (mode test)</button>
+</form>
+
+{% elif paiement.statut == "confirme" %}
+<div class="alert alert-success">Paiement déjà confirmé.</div>
+<a href="{% url 'paiements:succes' commande.id %}" class="btn btn-outline-primary">Voir le reçu</a>
+
+{% else %}
+<div class="alert alert-danger">Le paiement a échoué. Merci de réessayer.</div>
+<form method="post" action="{% url 'paiements:initier' commande.id %}">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-primary">Réessayer</button>
+</form>
+{% endif %}
+{% endblock %}

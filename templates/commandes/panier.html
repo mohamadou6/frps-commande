@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Panier - Commande FRPS{% endblock %}
+{% block content %}
+<h1 class="h4 mb-3">Mon panier</h1>
+<table class="table table-striped align-middle">
+    <thead>
+        <tr>
+            <th>Produit</th>
+            <th>Quantité</th>
+            <th>Prix unitaire</th>
+            <th>Sous-total</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for ligne in commande.lignes.all %}
+        <tr>
+            <td>{{ ligne.produit.nom }}</td>
+            <td>{{ ligne.quantite }}</td>
+            <td>{{ ligne.prix_unitaire_snapshot }} FCFA</td>
+            <td>{{ ligne.sous_total }} FCFA</td>
+            <td>
+                <form method="post" action="{% url 'commandes:retirer' ligne.produit.id %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-sm btn-outline-danger">Retirer</button>
+                </form>
+            </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5" class="text-center text-muted">Votre panier est vide. <a href="{% url 'catalogue:liste' %}">Parcourir le catalogue</a>.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+<div class="d-flex justify-content-between align-items-center">
+    <h2 class="h5">Total : {{ commande.montant_total }} FCFA</h2>
+    {% if commande.lignes.all %}
+    <form method="post" action="{% url 'commandes:confirmer' %}">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-success">Confirmer la commande</button>
+    </form>
+    {% endif %}
+</div>
+{% endblock %}

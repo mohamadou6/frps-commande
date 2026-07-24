@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Commande #{{ commande.id }} - Commande FRPS{% endblock %}
+{% block content %}
+<h1 class="h4 mb-3">Commande #{{ commande.id }}</h1>
+<p>Statut : <span class="badge bg-secondary">{{ commande.get_statut_display }}</span></p>
+<table class="table table-striped">
+    <thead>
+        <tr><th>Produit</th><th>Quantité</th><th>Prix unitaire</th><th>Sous-total</th></tr>
+    </thead>
+    <tbody>
+        {% for ligne in commande.lignes.all %}
+        <tr>
+            <td>{{ ligne.produit.nom }}</td>
+            <td>{{ ligne.quantite }}</td>
+            <td>{{ ligne.prix_unitaire_snapshot }} FCFA</td>
+            <td>{{ ligne.sous_total }} FCFA</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+<h2 class="h5">Total : {{ commande.montant_total }} FCFA</h2>
+<div class="d-flex gap-2 flex-wrap">
+    {% if commande.statut == "confirmee" %}
+    <a href="{% url 'paiements:payer' commande.id %}" class="btn btn-primary">Procéder au paiement</a>
+    {% endif %}
+    {% if commande.statut != "brouillon" %}
+    <a href="{% url 'commandes:telecharger_pdf' commande.id %}" class="btn btn-outline-secondary">Télécharger le PDF</a>
+    <button type="button" class="btn btn-success"
+            onclick="partagerPdfWhatsApp('{% url 'commandes:telecharger_pdf' commande.id %}', 'commande_{{ commande.id }}.pdf', 'Commande #{{ commande.id }} - {{ commande.formation_sanitaire.nom }} ({{ commande.montant_total }} FCFA)', this)">
+        Partager par WhatsApp
+    </button>
+    {% endif %}
+</div>
+{% endblock %}

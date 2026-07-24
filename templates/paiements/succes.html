@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Paiement confirmé - Commande FRPS{% endblock %}
+{% block content %}
+<div class="alert alert-success">
+    <h1 class="h4">Commande validée</h1>
+    <p>La commande #{{ commande.id }} de {{ commande.formation_sanitaire.nom }} a été payée
+       ({{ commande.montant_total }} FCFA{% if commande.paiement %} - {{ commande.paiement.get_methode_display }}{% endif %}).
+       Le personnel FRPS a été notifié par SMS avec le détail de la commande pour l'édition du reçu.</p>
+</div>
+<div class="d-flex gap-2 flex-wrap mb-3">
+    <a href="{% url 'commandes:telecharger_pdf' commande.id %}" class="btn btn-outline-secondary">Télécharger le PDF</a>
+    <button type="button" class="btn btn-success"
+            onclick="partagerPdfWhatsApp('{% url 'commandes:telecharger_pdf' commande.id %}', 'commande_{{ commande.id }}.pdf', 'Commande #{{ commande.id }} - {{ commande.formation_sanitaire.nom }} ({{ commande.montant_total }} FCFA)', this)">
+        Partager par WhatsApp
+    </button>
+</div>
+<a href="{% url 'commandes:historique' %}" class="btn btn-primary">Retour à mes commandes</a>
+{% endblock %}

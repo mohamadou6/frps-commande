@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Catalogue - Commande FRPS{% endblock %}
+{% block content %}
+<h1 class="h4 mb-3">Catalogue (stock synchronisé FRPS)</h1>
+<form method="get" class="row g-2 mb-3">
+    <div class="col-auto flex-grow-1">
+        <input type="search" name="q" value="{{ query }}" placeholder="Rechercher un produit..."
+               class="form-control" style="max-width: 400px;">
+    </div>
+    <div class="col-auto">
+        <button type="submit" class="btn btn-outline-primary">Rechercher</button>
+        {% if query %}
+        <a href="{% url 'catalogue:liste' %}" class="btn btn-outline-secondary">Réinitialiser</a>
+        {% endif %}
+    </div>
+</form>
+<table class="table table-striped align-middle">
+    <thead>
+        <tr>
+            <th>Produit</th>
+            <th>Unité</th>
+            <th>Prix unitaire</th>
+            <th>Stock disponible</th>
+            <th>Quantité</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for produit in produits %}
+        <tr>
+            <td>{{ produit.nom }}</td>
+            <td>{{ produit.unite }}</td>
+            <td>{{ produit.prix_unitaire }} FCFA</td>
+            <td>
+                {% if produit.stock_disponible > 0 %}
+                    <span class="badge bg-success">{{ produit.stock_disponible }}</span>
+                {% else %}
+                    <span class="badge bg-danger">Rupture</span>
+                {% endif %}
+            </td>
+            <td colspan="2">
+                <form method="post" action="{% url 'commandes:ajouter' produit.id %}" class="d-flex gap-2">
+                    {% csrf_token %}
+                    <input type="number" name="quantite" min="1" max="{{ produit.stock_disponible }}" value="1"
+                           class="form-control form-control-sm" style="width: 90px;"
+                           {% if produit.stock_disponible == 0 %}disabled{% endif %}>
+                    <button type="submit" class="btn btn-sm btn-primary" {% if produit.stock_disponible == 0 %}disabled{% endif %}>
+                        Ajouter
+                    </button>
+                </form>
+            </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" class="text-center text-muted">
+            {% if query %}Aucun produit ne correspond à « {{ query }} ».{% else %}Aucun produit synchronisé pour le moment.{% endif %}
+        </td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}
