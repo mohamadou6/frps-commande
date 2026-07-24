@@ -1,6 +1,7 @@
 import unicodedata
 
 from django.conf import settings
+from django.db.models import Q
 from django.urls import reverse
 
 from .backends import get_sms_backend
@@ -93,9 +94,10 @@ def _formatter_lignes_complet(commande):
 def notifier_nouvelle_commande(commande):
     from accounts.models import Role, User
 
-    numeros = User.objects.filter(role=Role.PERSONNEL_STOCK, is_active=True).exclude(
-        telephone=""
-    ).values_list("telephone", flat=True)
+    # L'admin FRPS supervise tout : il reçoit aussi les SMS destinés au personnel_stock.
+    numeros = User.objects.filter(
+        Q(role=Role.PERSONNEL_STOCK) | Q(role=Role.ADMIN), is_active=True
+    ).exclude(telephone="").values_list("telephone", flat=True)
 
     message = _construire_message(f"Commande #{commande.pk}", commande, "Facture Sage SVP.")
     _envoyer_a_destinataires(numeros, message, TypeEvenement.NOUVELLE_COMMANDE, commande=commande)
@@ -114,9 +116,10 @@ def notifier_nouvelle_commande(commande):
 def notifier_paiement_confirme(commande):
     from accounts.models import Role, User
 
-    numeros = User.objects.filter(role=Role.PERSONNEL_COMPTABILITE, is_active=True).exclude(
-        telephone=""
-    ).values_list("telephone", flat=True)
+    # L'admin FRPS supervise tout : il reçoit aussi les SMS destinés au personnel_comptabilite.
+    numeros = User.objects.filter(
+        Q(role=Role.PERSONNEL_COMPTABILITE) | Q(role=Role.ADMIN), is_active=True
+    ).exclude(telephone="").values_list("telephone", flat=True)
 
     message = _construire_message(f"Paiement recu #{commande.pk}", commande, "Recu SVP.")
     _envoyer_a_destinataires(numeros, message, TypeEvenement.PAIEMENT_CONFIRME, commande=commande)
