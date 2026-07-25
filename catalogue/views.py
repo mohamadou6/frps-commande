@@ -9,7 +9,7 @@ from .models import Magasin, Produit
 def liste(request):
     query = request.GET.get("q", "").strip()
     produits = Produit.objects.filter(
-        actif=True, magasin__in=[Magasin.PRINCIPAL, Magasin.UCPC]
+        actif=True, magasin__in=[Magasin.PRINCIPAL, Magasin.UCPC], stock_disponible__gt=0
     ).order_by("nom")
     if query:
         produits = produits.filter(nom__icontains=query)
