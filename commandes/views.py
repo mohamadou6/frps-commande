@@ -3,7 +3,7 @@ from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
-from accounts.decorators import formation_sanitaire_required
+from accounts.decorators import formation_sanitaire_required, personnel_frps_required
 from catalogue.models import Produit
 from notifications.pdf import generer_pdf_commande, verifier_token_pdf
 
@@ -79,6 +79,17 @@ def telecharger_pdf(request, commande_id):
     commande = get_object_or_404(
         Commande, pk=commande_id, formation_sanitaire=request.user.formation_sanitaire
     )
+    pdf_bytes = generer_pdf_commande(commande)
+    response = HttpResponse(pdf_bytes, content_type="application/pdf")
+    response["Content-Disposition"] = f'attachment; filename="commande_{commande.pk}.pdf"'
+    return response
+
+
+@personnel_frps_required
+def telecharger_pdf_staff(request, commande_id):
+    """Téléchargement du PDF par le personnel FRPS (depuis la page notifications),
+    sans restriction à une formation sanitaire précise."""
+    commande = get_object_or_404(Commande, pk=commande_id)
     pdf_bytes = generer_pdf_commande(commande)
     response = HttpResponse(pdf_bytes, content_type="application/pdf")
     response["Content-Disposition"] = f'attachment; filename="commande_{commande.pk}.pdf"'
