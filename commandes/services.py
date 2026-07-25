@@ -1,4 +1,8 @@
+from django.db import transaction
+from django.db.models import F
 from django.utils import timezone
+
+from catalogue.models import Produit
 
 from .models import Commande, LigneCommande, StatutCommande
 
@@ -45,7 +49,7 @@ def retirer_produit(commande, produit):
 
 
 def confirmer_commande(commande):
-    """Verrouille la commande, notifie le personnel FRPS chargé du stock."""
+    """Verrouille la commande, débite le stock, notifie le personnel FRPS chargé du stock."""
     from notifications.services import notifier_nouvelle_commande
 
     if commande.statut != StatutCommande.BROUILLON:
@@ -53,16 +57,24 @@ def confirmer_commande(commande):
     if not commande.lignes.exists():
         raise ValueError("Le panier est vide")
 
-    for ligne in commande.lignes.select_related("produit"):
-        if ligne.quantite > ligne.produit.stock_disponible:
-            raise StockInsuffisantError(
-                f"Stock insuffisant pour {ligne.produit.nom} (disponible : {ligne.produit.stock_disponible})"
-            )
+    with transaction.atomic():
+        # Débit atomique conditionné sur le stock au moment de l'update (évite qu'une
+        # commande concurrente ne fasse passer le stock sous zéro entre la vérification
+        # et le débit).
+        for ligne in commande.lignes.select_related("produit"):
+            debite = Produit.objects.filter(
+                pk=ligne.produit_id, stock_disponible__gte=ligne.quantite
+            ).update(stock_disponible=F("stock_disponible") - ligne.quantite)
+            if not debite:
+                raise StockInsuffisantError(
+                    f"Stock insuffisant pour {ligne.produit.nom} "
+                    f"(disponible : {ligne.produit.stock_disponible})"
+                )
 
-    commande.recalculer_montant()
-    commande.statut = StatutCommande.CONFIRMEE
-    commande.date_confirmation = timezone.now()
-    commande.save(update_fields=["statut", "date_confirmation"])
+        commande.recalculer_montant()
+        commande.statut = StatutCommande.CONFIRMEE
+        commande.date_confirmation = timezone.now()
+        commande.save(update_fields=["statut", "date_confirmation"])
 
     notifier_nouvelle_commande(commande)
     return commande
