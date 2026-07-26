@@ -20,9 +20,6 @@
 </table>
 <h2 class="h5">Total : {{ commande.montant_total }} FCFA</h2>
 <div class="d-flex gap-2 flex-wrap">
-    {% if commande.statut == "confirmee" %}
-    <a href="{% url 'paiements:payer' commande.id %}" class="btn btn-primary">Procéder au paiement</a>
-    {% endif %}
     {% if commande.statut != "brouillon" %}
     <a href="{% url 'commandes:telecharger_pdf' commande.id %}" class="btn btn-outline-secondary">Télécharger le PDF</a>
     <button type="button" class="btn btn-success"

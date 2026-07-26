@@ -3,7 +3,7 @@ from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
-from accounts.decorators import formation_sanitaire_required, personnel_frps_required
+from accounts.decorators import formation_sanitaire_only_required, personnel_frps_required
 from catalogue.models import Produit
 from notifications.pdf import generer_pdf_commande, verifier_token_pdf
 
@@ -11,13 +11,13 @@ from . import services
 from .models import Commande, StatutCommande
 
 
-@formation_sanitaire_required
+@formation_sanitaire_only_required
 def panier(request):
     commande = services.get_panier(request.user.formation_sanitaire)
     return render(request, "commandes/panier.html", {"commande": commande})
 
 
-@formation_sanitaire_required
+@formation_sanitaire_only_required
 @require_POST
 def ajouter(request, produit_id):
     produit = get_object_or_404(Produit, pk=produit_id, actif=True)
@@ -31,7 +31,7 @@ def ajouter(request, produit_id):
     return redirect("catalogue:liste")
 
 
-@formation_sanitaire_required
+@formation_sanitaire_only_required
 @require_POST
 def retirer(request, produit_id):
     produit = get_object_or_404(Produit, pk=produit_id)
@@ -41,20 +41,20 @@ def retirer(request, produit_id):
     return redirect("commandes:panier")
 
 
-@formation_sanitaire_required
+@formation_sanitaire_only_required
 @require_POST
 def confirmer(request):
     commande = services.get_panier(request.user.formation_sanitaire)
     try:
         services.confirmer_commande(commande)
         messages.success(request, "Commande confirmée. Le FRPS a été notifié par SMS.")
-        return redirect("paiements:payer", commande_id=commande.pk)
+        return redirect("commandes:detail", commande_id=commande.pk)
     except (services.StockInsuffisantError, ValueError) as exc:
         messages.error(request, str(exc))
         return redirect("commandes:panier")
 
 
-@formation_sanitaire_required
+@formation_sanitaire_only_required
 def historique(request):
     commandes = (
         Commande.objects.filter(formation_sanitaire=request.user.formation_sanitaire)
@@ -64,7 +64,7 @@ def historique(request):
     return render(request, "commandes/historique.html", {"commandes": commandes})
 
 
-@formation_sanitaire_required
+@formation_sanitaire_only_required
 def detail(request, commande_id):
     commande = get_object_or_404(
         Commande, pk=commande_id, formation_sanitaire=request.user.formation_sanitaire
@@ -72,7 +72,7 @@ def detail(request, commande_id):
     return render(request, "commandes/detail.html", {"commande": commande})
 
 
-@formation_sanitaire_required
+@formation_sanitaire_only_required
 def telecharger_pdf(request, commande_id):
     """Téléchargement du PDF par la FOSA elle-même (pour l'enregistrer ou le partager,
     par exemple via le bouton « Partager par WhatsApp »)."""

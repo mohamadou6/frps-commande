@@ -3,14 +3,14 @@ from django.contrib import messages
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
-from accounts.decorators import formation_sanitaire_required
+from accounts.decorators import formation_sanitaire_only_required
 from commandes.models import Commande, StatutCommande
 
 from . import services
 from .models import Paiement
 
 
-@formation_sanitaire_required
+@formation_sanitaire_only_required
 def payer(request, commande_id):
     commande = get_object_or_404(
         Commande, pk=commande_id, formation_sanitaire=request.user.formation_sanitaire
@@ -31,7 +31,7 @@ def payer(request, commande_id):
     )
 
 
-@formation_sanitaire_required
+@formation_sanitaire_only_required
 @require_POST
 def initier(request, commande_id):
     commande = get_object_or_404(
@@ -45,7 +45,7 @@ def initier(request, commande_id):
     return redirect("paiements:payer", commande_id=commande.pk)
 
 
-@formation_sanitaire_required
+@formation_sanitaire_only_required
 @require_POST
 def payer_especes(request, commande_id):
     """Valide la commande en paiement espèces : aucune étape supplémentaire."""
@@ -64,7 +64,7 @@ def payer_especes(request, commande_id):
     return redirect("paiements:succes", commande_id=commande.pk)
 
 
-@formation_sanitaire_required
+@formation_sanitaire_only_required
 @require_POST
 def confirmer_mock(request, commande_id):
     """Simule le callback Orange Money (uniquement utile en mode mock/démo)."""
@@ -80,7 +80,7 @@ def confirmer_mock(request, commande_id):
     return redirect("paiements:succes", commande_id=commande.pk)
 
 
-@formation_sanitaire_required
+@formation_sanitaire_only_required
 def succes(request, commande_id):
     commande = get_object_or_404(
         Commande, pk=commande_id, formation_sanitaire=request.user.formation_sanitaire

@@ -22,6 +22,10 @@ class User(AbstractUser):
         return self.role == Role.FORMATION_SANITAIRE
 
     @property
+    def is_admin_frps(self):
+        return self.role == Role.ADMIN
+
+    @property
     def is_personnel_stock(self):
         return self.role == Role.PERSONNEL_STOCK
 

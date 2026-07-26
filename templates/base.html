@@ -12,11 +12,14 @@
         <a class="navbar-brand" href="{% if user.is_authenticated and not user.is_formation_sanitaire %}{% url 'notifications:liste' %}{% else %}{% url 'catalogue:liste' %}{% endif %}">Commande FRPS</a>
         {% if user.is_authenticated %}
         <div class="d-flex align-items-center gap-3">
-            {% if user.is_formation_sanitaire %}
+            {% if user.is_formation_sanitaire or user.is_admin_frps %}
             <a class="nav-link text-white d-inline" href="{% url 'catalogue:liste' %}">Catalogue</a>
+            {% endif %}
+            {% if user.is_formation_sanitaire %}
             <a class="nav-link text-white d-inline" href="{% url 'commandes:panier' %}">Panier</a>
             <a class="nav-link text-white d-inline" href="{% url 'commandes:historique' %}">Mes commandes</a>
-            {% else %}
+            {% endif %}
+            {% if not user.is_formation_sanitaire %}
             <a class="nav-link text-white d-inline" href="{% url 'notifications:liste' %}">
                 Notifications
                 {% if notifications_non_lues_count %}<span class="badge bg-danger">{{ notifications_non_lues_count }}</span>{% endif %}

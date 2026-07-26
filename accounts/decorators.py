@@ -32,3 +32,22 @@ def personnel_frps_required(view_func):
         return view_func(request, *args, **kwargs)
 
     return wrapper
+
+
+def formation_sanitaire_only_required(view_func):
+    """Réservé aux comptes ayant un vrai profil FormationSanitaire (panier, commandes,
+    paiements). Contrairement à formation_sanitaire_required, l'admin FRPS n'a PAS
+    accès ici : il n'a pas de profil FormationSanitaire, ces vues planteraient sinon.
+    Redirigé vers le catalogue (lecture seule) plutôt qu'une erreur."""
+
+    @login_required
+    @wraps(view_func)
+    def wrapper(request, *args, **kwargs):
+        user = request.user
+        if user.is_formation_sanitaire:
+            return view_func(request, *args, **kwargs)
+        if user.role == Role.ADMIN:
+            return redirect("catalogue:liste")
+        return redirect("notifications:liste")
+
+    return wrapper
