@@ -2,6 +2,7 @@
 {% block title %}Mes commandes - Commande FRPS{% endblock %}
 {% block content %}
 <h1 class="h4 mb-3">Mes commandes</h1>
+<div class="table-responsive">
 <table class="table table-striped">
     <thead>
         <tr><th>#</th><th>Date</th><th>Statut</th><th>Montant</th><th></th></tr>
@@ -20,4 +21,5 @@
         {% endfor %}
     </tbody>
 </table>
+</div>
 {% endblock %}

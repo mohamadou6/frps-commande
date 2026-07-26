@@ -3,6 +3,7 @@
 {% block content %}
 <h1 class="h4 mb-3">Commande #{{ commande.id }}</h1>
 <p>Statut : <span class="badge bg-secondary">{{ commande.get_statut_display }}</span></p>
+<div class="table-responsive">
 <table class="table table-striped">
     <thead>
         <tr><th>Produit</th><th>Quantité</th><th>Prix unitaire</th><th>Sous-total</th></tr>
@@ -18,6 +19,7 @@
         {% endfor %}
     </tbody>
 </table>
+</div>
 <h2 class="h5">Total : {{ commande.montant_total }} FCFA</h2>
 <div class="d-flex gap-2 flex-wrap">
     {% if commande.statut != "brouillon" %}
