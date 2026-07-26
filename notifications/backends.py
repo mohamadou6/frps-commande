@@ -88,6 +88,8 @@ class OrangeSMSBackend(SMSBackend):
         return reponse.json()["access_token"]
 
     def send(self, numero: str, message: str) -> bool:
+        from urllib.parse import quote
+
         import requests
 
         sender_address = settings.ORANGE_SMS_SENDER_ADDRESS
@@ -96,20 +98,28 @@ class OrangeSMSBackend(SMSBackend):
 
         jeton = self._obtenir_jeton()
         adresse_dest = numero if numero.startswith("tel:") else f"tel:{numero}"
+        # Le segment tel:+237... doit être URL-encodé dans le chemin (doc Orange :
+        # /outbound/tel%3A%2B{numero}/requests), sinon l'API renvoie une erreur.
+        chemin_sender = quote(sender_address, safe="")
+
+        requete = {
+            "address": adresse_dest,
+            "senderAddress": sender_address,
+            "outboundSMSTextMessage": {"message": message},
+        }
+        if settings.ORANGE_SMS_SENDER_NAME:
+            requete["senderName"] = settings.ORANGE_SMS_SENDER_NAME
 
         reponse = requests.post(
-            f"https://api.orange.com/smsmessaging/v1/outbound/{sender_address}/requests",
-            json={
-                "outboundSMSMessageRequest": {
-                    "address": [adresse_dest],
-                    "senderAddress": sender_address,
-                    "outboundSMSTextMessage": {"message": message},
-                }
-            },
+            f"https://api.orange.com/smsmessaging/v1/outbound/{chemin_sender}/requests",
+            json={"outboundSMSMessageRequest": requete},
             headers={"Authorization": f"Bearer {jeton}", "Content-Type": "application/json"},
             timeout=15,
         )
-        reponse.raise_for_status()
+        try:
+            reponse.raise_for_status()
+        except requests.HTTPError as exc:
+            raise RuntimeError(f"Orange SMS API a échoué ({reponse.status_code}) : {reponse.text}") from exc
         return True
 
 

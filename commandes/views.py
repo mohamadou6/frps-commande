@@ -48,6 +48,8 @@ def confirmer(request):
     try:
         services.confirmer_commande(commande)
         messages.success(request, "Commande confirmée. Le FRPS a été notifié par SMS.")
+        # Le parcours FOSA s'arrête ici depuis le 2026-07-26 (plus d'étape paiement
+        # obligatoire) : voir paiements/views.py pour le contexte de cette décision.
         return redirect("commandes:detail", commande_id=commande.pk)
     except (services.StockInsuffisantError, ValueError) as exc:
         messages.error(request, str(exc))

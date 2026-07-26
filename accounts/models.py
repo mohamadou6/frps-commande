@@ -6,6 +6,10 @@ class Role(models.TextChoices):
     ADMIN = "admin", "Administrateur FRPS"
     FORMATION_SANITAIRE = "formation_sanitaire", "Formation sanitaire"
     PERSONNEL_STOCK = "personnel_stock", "Personnel FRPS - Gestion du stock"
+    # En pause depuis que l'étape paiement a été retirée du parcours FOSA (2026-07-26) :
+    # plus rien ne déclenche notifier_paiement_confirme() en usage normal (voir
+    # notifications/services.py et paiements/views.py). Rôle gardé tel quel, pas
+    # supprimé, au cas où l'étape paiement serait un jour réintroduite.
     PERSONNEL_COMPTABILITE = "personnel_comptabilite", "Personnel FRPS - Édition des reçus"
 
 

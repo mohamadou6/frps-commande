@@ -157,6 +157,9 @@ SMS_API_KEY = env("SMS_API_KEY", default="")
 ORANGE_SMS_CLIENT_ID = env("ORANGE_SMS_CLIENT_ID", default="")
 ORANGE_SMS_CLIENT_SECRET = env("ORANGE_SMS_CLIENT_SECRET", default="")
 ORANGE_SMS_SENDER_ADDRESS = env("ORANGE_SMS_SENDER_ADDRESS", default="")
+# Nom affiché comme expéditeur (ex: "SMS 844926" par défaut chez Orange, ou "FRPSNO"
+# une fois le sender name personnalisé validé par Orange). Optionnel.
+ORANGE_SMS_SENDER_NAME = env("ORANGE_SMS_SENDER_NAME", default="")
 
 PAYMENT_GATEWAY = env("PAYMENT_GATEWAY", default="mock")
 ORANGE_MONEY_API_URL = env("ORANGE_MONEY_API_URL", default="")

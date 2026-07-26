@@ -1,3 +1,8 @@
+# App en pause depuis le retrait de l'étape paiement du parcours FOSA (2026-07-26) :
+# confirmer_commande (commandes/views.py) mène directement au détail de la commande,
+# plus aucun lien de l'UI ne pointe vers ces vues. Gardées telles quelles pour un
+# usage interne FRPS futur si l'étape paiement est un jour réintroduite (voir aussi
+# accounts.models.Role.PERSONNEL_COMPTABILITE et notifications.services.notifier_paiement_confirme).
 from django.conf import settings
 from django.contrib import messages
 from django.shortcuts import get_object_or_404, redirect, render

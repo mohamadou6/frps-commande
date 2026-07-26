@@ -114,6 +114,10 @@ def notifier_nouvelle_commande(commande):
 
 
 def notifier_paiement_confirme(commande):
+    """En pause depuis le retrait de l'étape paiement du parcours FOSA (2026-07-26) :
+    plus aucune vue n'appelle cette fonction en usage normal, l'app paiements n'étant
+    plus dans le flux FOSA (voir commandes/views.py confirmer()). Gardée telle quelle
+    pour un usage interne futur si l'étape paiement est un jour réintroduite."""
     from accounts.models import Role, User
 
     # L'admin FRPS supervise tout : il reçoit aussi les SMS destinés au personnel_comptabilite.
