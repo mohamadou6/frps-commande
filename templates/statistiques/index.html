@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Statistiques - Commande FRPS{% endblock %}
+{% block content %}
+<h1 class="h4 mb-3">Statistiques</h1>
+<div class="row row-cols-1 row-cols-sm-2 g-3">
+    <div class="col">
+        <a href="{% url 'statistiques:par_produit' %}" class="card text-decoration-none h-100">
+            <div class="card-body">
+                <h2 class="h6 mb-2">Par produit</h2>
+                <p class="text-muted small mb-0">
+                    Quantité commandée, nombre de commandes et répartition par formation
+                    sanitaire, pour un produit et une période donnés.
+                </p>
+            </div>
+        </a>
+    </div>
+    <div class="col">
+        <a href="{% url 'statistiques:par_fosa' %}" class="card text-decoration-none h-100">
+            <div class="card-body">
+                <h2 class="h6 mb-2">Par formation sanitaire</h2>
+                <p class="text-muted small mb-0">
+                    Nombre de commandes, produits commandés et montant total, pour une
+                    formation sanitaire et une période données.
+                </p>
+            </div>
+        </a>
+    </div>
+</div>
+{% endblock %}

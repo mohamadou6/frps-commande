@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     'notifications',
     'paiements',
     'stock_sync',
+    'statistiques',
 ]
 
 AUTH_USER_MODEL = 'accounts.User'

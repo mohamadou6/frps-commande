@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Statistiques par produit - Commande FRPS{% endblock %}
+{% block content %}
+<h1 class="h4 mb-3">Statistiques par produit</h1>
+<form method="get" class="row g-2 align-items-end mb-4">
+    <div class="col-12 col-md-4">
+        <label class="form-label">Produit</label>
+        <select name="produit" class="form-select">
+            <option value="">— Choisir un produit —</option>
+            {% for p in produits %}
+            <option value="{{ p.id }}" {% if produit_id == p.id|stringformat:"s" %}selected{% endif %}>{{ p.nom }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="col-6 col-md-3">
+        <label class="form-label">Du</label>
+        <input type="date" name="debut" value="{{ debut }}" class="form-control">
+    </div>
+    <div class="col-6 col-md-3">
+        <label class="form-label">Au</label>
+        <input type="date" name="fin" value="{{ fin }}" class="form-control">
+    </div>
+    <div class="col-12 col-md-2">
+        <button type="submit" class="btn btn-primary w-100">Afficher</button>
+    </div>
+</form>
+
+{% if produit_id and not produit_selectionne %}
+<p class="text-danger">Produit introuvable.</p>
+{% elif produit_selectionne %}
+<h2 class="h6">{{ produit_selectionne.nom }} — du {{ debut }} au {{ fin }}</h2>
+<div class="row row-cols-1 row-cols-sm-3 g-3 mb-4">
+    <div class="col">
+        <div class="border rounded-3 p-3 text-center">
+            <div class="text-muted small">Quantité commandée</div>
+            <div class="fs-3 fw-bold text-success">{{ resultat.quantite_totale|default:0 }}</div>
+        </div>
+    </div>
+    <div class="col">
+        <div class="border rounded-3 p-3 text-center">
+            <div class="text-muted small">Commandes</div>
+            <div class="fs-3 fw-bold">{{ resultat.nb_commandes|default:0 }}</div>
+        </div>
+    </div>
+    <div class="col">
+        <div class="border rounded-3 p-3 text-center">
+            <div class="text-muted small">Formations sanitaires</div>
+            <div class="fs-3 fw-bold">{{ resultat.nb_fosa|default:0 }}</div>
+        </div>
+    </div>
+</div>
+
+<h3 class="h6">Répartition par formation sanitaire</h3>
+<div class="table-responsive">
+<table class="table table-striped">
+    <thead><tr><th>Formation sanitaire</th><th>Quantité</th><th>Commandes</th></tr></thead>
+    <tbody>
+        {% for ligne in repartition_fosa %}
+        <tr>
+            <td>{{ ligne.commande__formation_sanitaire__nom }}</td>
+            <td>{{ ligne.quantite }}</td>
+            <td>{{ ligne.nb_commandes }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="3" class="text-center text-muted">Aucune commande sur cette période.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+</div>
+{% endif %}
+{% endblock %}

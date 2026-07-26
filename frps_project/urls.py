@@ -17,4 +17,5 @@ urlpatterns = [
     path('panier/', include('commandes.urls')),
     path('paiements/', include('paiements.urls')),
     path('notifications/', include('notifications.urls')),
+    path('statistiques/', include('statistiques.urls')),
 ]
