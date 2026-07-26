@@ -1,25 +1,212 @@
 {% extends "base.html" %}
 {% block title %}Connexion - Commande FRPS{% endblock %}
+{% block container_class %}{% endblock %}
+{% block extra_head %}
+<style>
+    html, body {
+        height: 100%;
+    }
+    body {
+        background:
+            radial-gradient(circle at 12% 15%, rgba(255, 255, 255, 0.16) 0, transparent 38%),
+            radial-gradient(circle at 88% 12%, rgba(255, 255, 255, 0.12) 0, transparent 42%),
+            radial-gradient(circle at 8% 92%, rgba(6, 68, 40, 0.55) 0, transparent 45%),
+            radial-gradient(circle at 95% 88%, rgba(6, 95, 55, 0.5) 0, transparent 45%),
+            linear-gradient(160deg, #0b7a45 0%, #0f9d58 45%, #34c77b 100%);
+        min-height: 100vh;
+    }
+
+    .login-shell {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 2.5rem 1rem;
+    }
+
+    .login-card {
+        width: 100%;
+        max-width: 400px;
+        background: #ffffff;
+        border-radius: 28px;
+        padding: 2.25rem 2rem 2rem;
+        box-shadow: 0 30px 60px -20px rgba(6, 60, 35, 0.55);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .login-card::before {
+        content: "";
+        position: absolute;
+        top: -70px;
+        right: -70px;
+        width: 160px;
+        height: 160px;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(52, 199, 123, 0.25), rgba(52, 199, 123, 0));
+    }
+
+    .login-logo {
+        width: 132px;
+        height: 82px;
+        border-radius: 20px;
+        margin: 0 auto 1.1rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #ffffff;
+        box-shadow: 0 10px 22px -10px rgba(11, 61, 36, 0.35);
+        border: 1px solid #eef4f0;
+    }
+    /* Reconstitution vectorielle du logo FRPS Nord (à remplacer par le fichier
+       officiel si besoin : balise img pointant vers un fichier statique). */
+    .login-logo svg {
+        width: 112px;
+        height: 62px;
+    }
+
+    .login-brand {
+        text-align: center;
+        margin-bottom: 1.75rem;
+    }
+    .login-brand h1 {
+        font-size: 1.35rem;
+        font-weight: 700;
+        color: #0b3d24;
+        margin-bottom: 0.15rem;
+    }
+    .login-brand p {
+        font-size: 0.85rem;
+        color: #6c8a79;
+        margin-bottom: 0;
+    }
+
+    .field-group {
+        margin-bottom: 1.1rem;
+    }
+    .field-group label {
+        font-size: 0.78rem;
+        font-weight: 600;
+        color: #0b3d24;
+        margin-bottom: 0.35rem;
+        display: block;
+    }
+    .field-icon-wrap {
+        position: relative;
+        display: flex;
+        align-items: center;
+    }
+    .field-icon-wrap svg {
+        position: absolute;
+        left: 14px;
+        width: 18px;
+        height: 18px;
+        color: #59a97e;
+    }
+    .field-icon-wrap input {
+        width: 100%;
+        padding: 0.7rem 0.9rem 0.7rem 2.6rem;
+        border: 1.5px solid #e1efe6;
+        border-radius: 14px;
+        background: #f6faf8;
+        font-size: 0.95rem;
+        color: #0b3d24;
+        transition: border-color .15s ease, box-shadow .15s ease;
+    }
+    .field-icon-wrap input:focus {
+        outline: none;
+        border-color: #34c77b;
+        box-shadow: 0 0 0 3px rgba(52, 199, 123, 0.18);
+        background: #ffffff;
+    }
+
+    .btn-login {
+        width: 100%;
+        border: none;
+        border-radius: 999px;
+        padding: 0.75rem 1rem;
+        font-weight: 700;
+        font-size: 0.95rem;
+        color: #ffffff;
+        background: linear-gradient(90deg, #0f9d58, #34c77b);
+        box-shadow: 0 14px 24px -10px rgba(15, 157, 88, 0.65);
+        transition: transform .12s ease, box-shadow .12s ease;
+    }
+    .btn-login:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 18px 28px -10px rgba(15, 157, 88, 0.7);
+        color: #ffffff;
+    }
+    .btn-login:active {
+        transform: translateY(0);
+    }
+
+    .login-footnote {
+        text-align: center;
+        font-size: 0.8rem;
+        color: #6c8a79;
+        margin-top: 1.4rem;
+    }
+
+    .login-alert {
+        background: #fdeceb;
+        color: #9a2c22;
+        border: 1px solid #f6c8c3;
+        border-radius: 12px;
+        padding: 0.65rem 0.9rem;
+        font-size: 0.85rem;
+        margin-bottom: 1.1rem;
+    }
+</style>
+{% endblock %}
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-5">
-        <h1 class="h4 mb-3">Connexion formation sanitaire</h1>
-        <p class="text-muted">Les comptes sont créés par l'administrateur du FRPS.</p>
+<div class="login-shell">
+    <div class="login-card">
+        <div class="login-logo">
+            <svg viewBox="0 0 300 165" xmlns="http://www.w3.org/2000/svg">
+                <text x="6" y="88" font-family="Arial, Helvetica, sans-serif" font-weight="800" font-size="80" fill="#159249">FRP</text>
+                <text x="196" y="88" font-family="Arial, Helvetica, sans-serif" font-weight="800" font-size="88" fill="#3b6ea5">S</text>
+                <path d="M198,58 C222,46 244,28 258,8 C264,0 276,-3 288,4 C270,18 250,36 232,54 C222,64 208,66 198,58 Z" fill="#3b6ea5"/>
+                <line x1="10" y1="108" x2="290" y2="108" stroke="#1a1a1a" stroke-width="2.5"/>
+                <line x1="10" y1="118" x2="290" y2="118" stroke="#1a1a1a" stroke-width="1.4"/>
+                <text x="150" y="150" font-family="Arial, Helvetica, sans-serif" font-weight="700" font-size="34" fill="#1a1a1a" text-anchor="middle" letter-spacing="6">NORD</text>
+            </svg>
+        </div>
+        <div class="login-brand">
+            <h1>Commander vos produits de qualité</h1>
+            <p>Uniquement au FRPS-Nord</p>
+        </div>
+
+        {% if form.errors %}
+        <div class="login-alert">Identifiants incorrects.</div>
+        {% endif %}
+
         <form method="post">
             {% csrf_token %}
-            {% if form.errors %}
-                <div class="alert alert-danger">Identifiants incorrects.</div>
-            {% endif %}
-            <div class="mb-3">
-                <label class="form-label">Nom d'utilisateur</label>
-                {{ form.username }}
+            <div class="field-group">
+                <label for="id_username">Nom d'utilisateur</label>
+                <div class="field-icon-wrap">
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 12a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9Z" stroke="currentColor" stroke-width="1.6"/>
+                        <path d="M4 20.5c1.2-3.6 4.3-5.5 8-5.5s6.8 1.9 8 5.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                    </svg>
+                    <input type="text" id="id_username" name="username" autocomplete="username" autofocus required>
+                </div>
             </div>
-            <div class="mb-3">
-                <label class="form-label">Mot de passe</label>
-                {{ form.password }}
+            <div class="field-group">
+                <label for="id_password">Mot de passe</label>
+                <div class="field-icon-wrap">
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="5" y="10.5" width="14" height="9.5" rx="2.4" stroke="currentColor" stroke-width="1.6"/>
+                        <path d="M8 10.5V7.5a4 4 0 1 1 8 0v3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                    </svg>
+                    <input type="password" id="id_password" name="password" autocomplete="current-password" required>
+                </div>
             </div>
-            <button type="submit" class="btn btn-primary">Se connecter</button>
+            <button type="submit" class="btn-login">Se connecter</button>
         </form>
+
+        <p class="login-footnote">Les comptes sont créés par l'administrateur du FRPS.</p>
     </div>
 </div>
 {% endblock %}
