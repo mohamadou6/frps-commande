@@ -111,3 +111,49 @@ def par_fosa(request):
             "repartition_produits": repartition_produits,
         },
     )
+
+
+@personnel_frps_required
+def par_district(request):
+    districts = (
+        FormationSanitaire.objects.exclude(district="")
+        .values_list("district", flat=True)
+        .distinct()
+        .order_by("district")
+    )
+    debut, fin = _periode_depuis_requete(request)
+    district = request.GET.get("district")
+
+    resultat = None
+    repartition_fosa = []
+
+    if district:
+        commandes = Commande.objects.filter(
+            formation_sanitaire__district=district,
+            statut__in=COMMANDES_EFFECTIVES,
+            date_confirmation__date__gte=debut,
+            date_confirmation__date__lte=fin,
+        )
+        resultat = commandes.aggregate(nb_commandes=Count("id"), montant_total=Sum("montant_total"))
+        resultat["nb_produits"] = (
+            LigneCommande.objects.filter(commande__in=commandes).aggregate(total=Sum("quantite"))["total"] or 0
+        )
+        repartition_fosa = (
+            commandes.values("formation_sanitaire_id", "formation_sanitaire__nom")
+            .annotate(nb_commandes=Count("id", distinct=True), montant=Sum("montant_total"))
+            .order_by("formation_sanitaire__nom")
+        )
+        resultat["nb_fosa"] = len(repartition_fosa)
+
+    return render(
+        request,
+        "statistiques/par_district.html",
+        {
+            "districts": districts,
+            "debut": debut,
+            "fin": fin,
+            "district": district,
+            "resultat": resultat,
+            "repartition_fosa": repartition_fosa,
+        },
+    )

@@ -2,7 +2,7 @@
 {% block title %}Statistiques - Commande FRPS{% endblock %}
 {% block content %}
 <h1 class="h4 mb-3">Statistiques</h1>
-<div class="row row-cols-1 row-cols-sm-2 g-3">
+<div class="row row-cols-1 row-cols-sm-2 row-cols-lg-3 g-3">
     <div class="col">
         <a href="{% url 'statistiques:par_produit' %}" class="card text-decoration-none h-100">
             <div class="card-body">
@@ -10,6 +10,17 @@
                 <p class="text-muted small mb-0">
                     Quantité commandée, nombre de commandes et répartition par formation
                     sanitaire, pour un produit et une période donnés.
+                </p>
+            </div>
+        </a>
+    </div>
+    <div class="col">
+        <a href="{% url 'statistiques:par_district' %}" class="card text-decoration-none h-100">
+            <div class="card-body">
+                <h2 class="h6 mb-2">Par district</h2>
+                <p class="text-muted small mb-0">
+                    Commandes, produits et montant total d'un district, avec la liste des
+                    FOSA ayant commandé et un lien vers le détail de chacune.
                 </p>
             </div>
         </a>
