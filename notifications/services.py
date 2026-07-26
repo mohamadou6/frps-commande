@@ -99,7 +99,7 @@ def notifier_nouvelle_commande(commande):
         Q(role=Role.PERSONNEL_STOCK) | Q(role=Role.ADMIN), is_active=True
     ).exclude(telephone="").values_list("telephone", flat=True)
 
-    message = _construire_message(f"Commande #{commande.pk}", commande, "Facture Sage SVP.")
+    message = _construire_message(f"Cde #{commande.pk}", commande, "Editer la Facture sur Sage.")
     _envoyer_a_destinataires(numeros, message, TypeEvenement.NOUVELLE_COMMANDE, commande=commande)
 
     Notification.objects.create(
