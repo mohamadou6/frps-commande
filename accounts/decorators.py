@@ -34,6 +34,20 @@ def personnel_frps_required(view_func):
     return wrapper
 
 
+def admin_frps_required(view_func):
+    """Réservé au compte super admin FRPS (role=admin). Utilisé pour les actions
+    sensibles (ex: import de fichier pour actualiser stock/prix)."""
+
+    @login_required
+    @wraps(view_func)
+    def wrapper(request, *args, **kwargs):
+        if request.user.role != Role.ADMIN:
+            raise PermissionDenied("Réservé à l'administrateur FRPS.")
+        return view_func(request, *args, **kwargs)
+
+    return wrapper
+
+
 def formation_sanitaire_only_required(view_func):
     """Réservé aux comptes ayant un vrai profil FormationSanitaire (panier, commandes,
     paiements). Contrairement à formation_sanitaire_required, l'admin FRPS n'a PAS

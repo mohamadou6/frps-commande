@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}Importer les produits - Commande FRPS{% endblock %}
+{% block content %}
+<h1 class="h4 mb-3">Importer les produits (stock / prix)</h1>
+<p class="text-muted">
+    Charge un fichier Excel (.xlsx) pour actualiser le stock disponible et le prix
+    unitaire des produits déjà présents dans le catalogue. Le fichier doit contenir
+    une colonne code produit (ex. <code>code_sage</code>), une colonne prix
+    (ex. <code>prix_unitaire</code>) et une colonne stock (ex. <code>stock_disponible</code>) —
+    l'ordre des colonnes n'a pas d'importance, seuls les en-têtes comptent.
+    Seuls le stock et le prix sont modifiés : le nom, l'unité et le magasin des
+    produits ne sont pas touchés, et aucun nouveau produit n'est créé.
+</p>
+
+<form method="post" enctype="multipart/form-data" class="row g-2 align-items-end mb-4">
+    {% csrf_token %}
+    <div class="col-12 col-md-6">
+        <label class="form-label">Fichier Excel (.xlsx)</label>
+        <input type="file" name="fichier" accept=".xlsx,.xlsm" class="form-control" required>
+    </div>
+    <div class="col-12 col-md-3">
+        <button type="submit" class="btn btn-primary w-100">Importer</button>
+    </div>
+</form>
+
+{% if resultats %}
+<div class="row row-cols-2 row-cols-md-3 g-3 mb-4">
+    <div class="col">
+        <div class="border rounded-3 p-3 text-center">
+            <div class="text-muted small">Lignes lues</div>
+            <div class="fs-3 fw-bold">{{ resultats.total_lignes }}</div>
+        </div>
+    </div>
+    <div class="col">
+        <div class="border rounded-3 p-3 text-center">
+            <div class="text-muted small">Modifiés</div>
+            <div class="fs-3 fw-bold text-success">{{ resultats.nb_modifies }}</div>
+        </div>
+    </div>
+    <div class="col">
+        <div class="border rounded-3 p-3 text-center">
+            <div class="text-muted small">Inchangés</div>
+            <div class="fs-3 fw-bold">{{ resultats.nb_inchanges }}</div>
+        </div>
+    </div>
+    <div class="col">
+        <div class="border rounded-3 p-3 text-center">
+            <div class="text-muted small">Introuvables</div>
+            <div class="fs-3 fw-bold text-danger">{{ resultats.nb_introuvables }}</div>
+        </div>
+    </div>
+</div>
+
+{% if resultats.modifies %}
+<h2 class="h6">Produits modifiés</h2>
+<div class="table-responsive mb-4">
+<table class="table table-striped">
+    <thead><tr><th>Produit</th><th>Prix</th><th>Stock</th></tr></thead>
+    <tbody>
+        {% for m in resultats.modifies|slice:":300" %}
+        <tr>
+            <td>{{ m.nom }} <span class="text-muted small">({{ m.code_sage }})</span></td>
+            <td>{{ m.ancien_prix }} → <strong>{{ m.nouveau_prix }}</strong></td>
+            <td>{{ m.ancien_stock }} → <strong>{{ m.nouveau_stock }}</strong></td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% if resultats.nb_modifies > 300 %}
+<p class="text-muted small">Et {{ resultats.nb_modifies|add:"-300" }} autres produits modifiés.</p>
+{% endif %}
+</div>
+{% endif %}
+
+{% if resultats.introuvables %}
+<h2 class="h6">Codes introuvables dans le catalogue</h2>
+<p class="text-muted small">
+    Ces codes du fichier ne correspondent à aucun produit existant — ils ont été ignorés
+    (aucun produit n'est créé automatiquement).
+</p>
+<div class="table-responsive mb-4">
+<table class="table table-striped">
+    <thead><tr><th>Code</th></tr></thead>
+    <tbody>
+        {% for code in resultats.introuvables|slice:":100" %}
+        <tr><td>{{ code }}</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% if resultats.nb_introuvables > 100 %}
+<p class="text-muted small">Et {{ resultats.nb_introuvables|add:"-100" }} autres codes introuvables.</p>
+{% endif %}
+</div>
+{% endif %}
+{% endif %}
+{% endblock %}

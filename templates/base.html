@@ -71,7 +71,17 @@
         </button>
         <div class="collapse navbar-collapse" id="navPrincipale">
             <div class="d-flex flex-column flex-lg-row align-items-lg-center gap-2 ms-lg-auto">
-                {% if user.is_formation_sanitaire or user.is_admin_frps %}
+                {% if user.is_admin_frps %}
+                <div class="dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        Catalogue
+                    </a>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="{% url 'catalogue:liste' %}">Voir le catalogue</a></li>
+                        <li><a class="dropdown-item" href="{% url 'catalogue:importer' %}">Importer les produits</a></li>
+                    </ul>
+                </div>
+                {% elif user.is_formation_sanitaire %}
                 <a class="nav-link" href="{% url 'catalogue:liste' %}">Catalogue</a>
                 {% endif %}
                 {% if user.is_formation_sanitaire %}
