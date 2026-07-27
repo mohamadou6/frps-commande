@@ -235,6 +235,31 @@ def stock(request):
         .order_by("-quantite")
     )
 
+    top_commandes_qs = (
+        LigneCommande.objects.filter(
+            produit__in=produits_catalogue,
+            commande__statut__in=COMMANDES_EFFECTIVES,
+            commande__date_confirmation__date__gte=debut,
+            commande__date_confirmation__date__lte=fin,
+        )
+        .values("produit_id", "produit__nom")
+        .annotate(quantite=Sum("quantite"), nb_commandes=Count("commande", distinct=True))
+        .order_by("-quantite")
+    )
+
+    menace_rupture_qs = (
+        LigneCommande.objects.filter(
+            produit__in=produits_catalogue.filter(stock_disponible__gt=0),
+            commande__statut__in=COMMANDES_EFFECTIVES,
+            commande__date_confirmation__date__gte=debut,
+            commande__date_confirmation__date__lte=fin,
+        )
+        .values("produit_id", "produit__nom", "produit__stock_disponible")
+        .annotate(quantite=Sum("quantite"), nb_commandes=Count("commande", distinct=True))
+        .filter(quantite__gte=F("produit__stock_disponible"))
+        .order_by("-quantite")
+    )
+
     export = request.GET.get("export")
     if export == "rupture":
         lignes_export = [(l["produit__nom"], l["quantite"], l["nb_commandes"]) for l in ruptures_qs]
@@ -248,6 +273,23 @@ def stock(request):
         return _reponse_xlsx(
             "stock_produits.xlsx",
             ["Produit", "Stock disponible"],
+            lignes_export,
+        )
+    if export == "top_commandes":
+        lignes_export = [(l["produit__nom"], l["quantite"], l["nb_commandes"]) for l in top_commandes_qs]
+        return _reponse_xlsx(
+            "stock_produits_les_plus_commandes.xlsx",
+            ["Produit", "Quantité commandée", "Commandes"],
+            lignes_export,
+        )
+    if export == "menace_rupture":
+        lignes_export = [
+            (l["produit__nom"], l["produit__stock_disponible"], l["quantite"], l["nb_commandes"])
+            for l in menace_rupture_qs
+        ]
+        return _reponse_xlsx(
+            "stock_menace_de_rupture.xlsx",
+            ["Produit", "Stock disponible", "Quantité commandée", "Commandes"],
             lignes_export,
         )
 
@@ -264,5 +306,7 @@ def stock(request):
             "valeur_totale_stock": valeur_totale_stock,
             "produits_stock": produits_catalogue.order_by("nom"),
             "ruptures_plus_commandes": ruptures_qs[:20],
+            "top_commandes": top_commandes_qs[:20],
+            "menace_rupture": menace_rupture_qs[:20],
         },
     )
