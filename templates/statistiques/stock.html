@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Stock - Commande FRPS{% endblock %}
+{% block content %}
+<h1 class="h4 mb-3">Stock du catalogue</h1>
+
+<div class="row row-cols-2 row-cols-md-3 row-cols-lg-5 g-3 mb-4">
+    <div class="col">
+        <div class="border rounded-3 p-3 text-center">
+            <div class="text-muted small">Produits au catalogue</div>
+            <div class="fs-3 fw-bold">{{ nb_produits_catalogue }}</div>
+        </div>
+    </div>
+    <div class="col">
+        <div class="border rounded-3 p-3 text-center">
+            <div class="text-muted small">En stock</div>
+            <div class="fs-3 fw-bold text-success">{{ nb_en_stock }}</div>
+        </div>
+    </div>
+    <div class="col">
+        <div class="border rounded-3 p-3 text-center">
+            <div class="text-muted small">En rupture</div>
+            <div class="fs-3 fw-bold text-danger">{{ nb_rupture }}</div>
+        </div>
+    </div>
+    <div class="col">
+        <div class="border rounded-3 p-3 text-center">
+            <div class="text-muted small">Quantité totale en stock</div>
+            <div class="fs-3 fw-bold">{{ quantite_totale_stock }}</div>
+        </div>
+    </div>
+    <div class="col">
+        <div class="border rounded-3 p-3 text-center">
+            <div class="text-muted small">Valeur du stock</div>
+            <div class="fs-3 fw-bold">{{ valeur_totale_stock|floatformat:0|intcomma }} FCFA</div>
+        </div>
+    </div>
+</div>
+
+<h2 class="h6">Produits les plus commandés actuellement en rupture</h2>
+<form method="get" class="row g-2 align-items-end mb-3">
+    <div class="col-6 col-md-3">
+        <label class="form-label">Du</label>
+        <input type="date" name="debut" value="{{ debut }}" class="form-control">
+    </div>
+    <div class="col-6 col-md-3">
+        <label class="form-label">Au</label>
+        <input type="date" name="fin" value="{{ fin }}" class="form-control">
+    </div>
+    <div class="col-12 col-md-2">
+        <button type="submit" class="btn btn-primary w-100">Afficher</button>
+    </div>
+    <div class="col-12 col-md-2">
+        <button type="submit" name="export" value="rupture" class="btn btn-outline-success w-100">Exporter en Excel</button>
+    </div>
+</form>
+<div class="table-responsive mb-4">
+<table class="table table-striped">
+    <thead><tr><th>Produit</th><th>Quantité commandée</th><th>Commandes</th></tr></thead>
+    <tbody>
+        {% for ligne in ruptures_plus_commandes %}
+        <tr>
+            <td>{{ ligne.produit__nom }}</td>
+            <td>{{ ligne.quantite }}</td>
+            <td>{{ ligne.nb_commandes }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="3" class="text-center text-muted">Aucun produit en rupture commandé sur cette période.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+</div>
+
+<div class="d-flex justify-content-between align-items-end mb-3">
+    <h2 class="h6 mb-0">Quantité disponible par produit</h2>
+    <a href="?export=stock" class="btn btn-outline-success btn-sm">Exporter en Excel</a>
+</div>
+<input type="text" id="recherche-stock" class="form-control mb-3" autocomplete="off"
+       placeholder="Rechercher un produit par son nom...">
+<div class="table-responsive">
+<table class="table table-striped">
+    <thead><tr><th>Produit</th><th>Stock disponible</th></tr></thead>
+    <tbody id="table-stock-corps">
+        {% for p in produits_stock %}
+        <tr class="ligne-produit-stock" data-nom="{{ p.nom|lower }}">
+            <td>{{ p.nom }}</td>
+            <td class="{% if p.stock_disponible == 0 %}text-danger fw-bold{% endif %}">{{ p.stock_disponible }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+</div>
+
+<script>
+document.getElementById("recherche-stock").addEventListener("input", function () {
+    var requete = this.value.trim().toLowerCase();
+    document.querySelectorAll("#table-stock-corps .ligne-produit-stock").forEach(function (ligne) {
+        ligne.style.display = ligne.dataset.nom.includes(requete) ? "" : "none";
+    });
+});
+</script>
+{% endblock %}

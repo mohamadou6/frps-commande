@@ -65,7 +65,7 @@
 {% if user.is_authenticated %}
 <nav class="navbar navbar-expand-lg navbar-dark app-navbar mb-4">
     <div class="container">
-        <a class="navbar-brand text-white" href="{% if not user.is_formation_sanitaire %}{% url 'notifications:liste' %}{% else %}{% url 'catalogue:liste' %}{% endif %}">Commande FRPS</a>
+        <a class="navbar-brand text-white" href="{% if not user.is_formation_sanitaire %}{% url 'notifications:liste' %}{% else %}{% url 'catalogue:liste' %}{% endif %}">Bienvenue au FRPS-NO en Ligne</a>
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navPrincipale" aria-controls="navPrincipale" aria-expanded="false" aria-label="Ouvrir le menu">
             <span class="navbar-toggler-icon"></span>
         </button>
@@ -91,6 +91,7 @@
                         <li><a class="dropdown-item" href="{% url 'statistiques:par_produit' %}">Par produit</a></li>
                         <li><a class="dropdown-item" href="{% url 'statistiques:par_district' %}">Par district</a></li>
                         <li><a class="dropdown-item" href="{% url 'statistiques:par_fosa' %}">Par formation sanitaire</a></li>
+                        <li><a class="dropdown-item" href="{% url 'statistiques:stock' %}">Stock</a></li>
                     </ul>
                 </div>
                 {% endif %}
