@@ -98,6 +98,8 @@
                         Statistiques
                     </a>
                     <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="{% url 'statistiques:index' %}">Tableau de bord</a></li>
+                        <li><hr class="dropdown-divider"></li>
                         <li><a class="dropdown-item" href="{% url 'statistiques:par_produit' %}">Par produit</a></li>
                         <li><a class="dropdown-item" href="{% url 'statistiques:par_district' %}">Par district</a></li>
                         <li><a class="dropdown-item" href="{% url 'statistiques:par_fosa' %}">Par formation sanitaire</a></li>

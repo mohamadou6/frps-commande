@@ -1,7 +1,105 @@
 {% extends "base.html" %}
-{% block title %}Statistiques - Commande FRPS{% endblock %}
+{% load humanize %}
+{% block title %}Tableau de bord - Commande FRPS{% endblock %}
 {% block content %}
-<h1 class="h4 mb-3">Statistiques</h1>
+<h1 class="h4 mb-3">Tableau de bord</h1>
+<p class="text-muted small">Vue d'ensemble de l'activité des {{ debut_periode|date:"d/m/Y" }} au {{ aujourd_hui|date:"d/m/Y" }} (30 derniers jours).</p>
+
+<div class="row row-cols-2 row-cols-md-3 row-cols-lg-5 g-3 mb-4">
+    <div class="col">
+        <div class="border rounded-3 p-3 text-center">
+            <div class="text-muted small">Commandes (30j)</div>
+            <div class="fs-3 fw-bold">{{ nb_commandes_periode }}</div>
+        </div>
+    </div>
+    <div class="col">
+        <div class="border rounded-3 p-3 text-center">
+            <div class="text-muted small">Montant (30j)</div>
+            <div class="fs-3 fw-bold text-success">{{ montant_periode|floatformat:0|intcomma }} FCFA</div>
+        </div>
+    </div>
+    <div class="col">
+        <div class="border rounded-3 p-3 text-center">
+            <div class="text-muted small">FOSA actives</div>
+            <div class="fs-3 fw-bold">{{ nb_fosa_actives }}</div>
+        </div>
+    </div>
+    <div class="col">
+        <div class="border rounded-3 p-3 text-center">
+            <div class="text-muted small">Produits en rupture</div>
+            <div class="fs-3 fw-bold text-danger">{{ nb_rupture }}</div>
+        </div>
+    </div>
+    <div class="col">
+        <div class="border rounded-3 p-3 text-center">
+            <div class="text-muted small">Produits menacés</div>
+            <div class="fs-3 fw-bold text-warning">{{ nb_menace }}</div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-12 col-lg-7">
+        <h2 class="h6">Dernières commandes</h2>
+        <div class="table-responsive">
+        <table class="table table-striped">
+            <thead><tr><th>Formation sanitaire</th><th>Date</th><th>Montant</th></tr></thead>
+            <tbody>
+                {% for c in dernieres_commandes %}
+                <tr>
+                    <td>{{ c.formation_sanitaire.nom }}</td>
+                    <td>{{ c.date_confirmation|date:"d/m/Y H:i" }}</td>
+                    <td>{{ c.montant_total|floatformat:0|intcomma }} FCFA</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="3" class="text-center text-muted">Aucune commande pour le moment.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        </div>
+    </div>
+    <div class="col-12 col-lg-5">
+        <h2 class="h6">Produits les plus commandés (30j)</h2>
+        <div class="table-responsive">
+        <table class="table table-striped">
+            <thead><tr><th>Produit</th><th>Quantité</th></tr></thead>
+            <tbody>
+                {% for ligne in top_produits_periode %}
+                <tr>
+                    <td>{{ ligne.produit__nom }}</td>
+                    <td>{{ ligne.quantite }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="2" class="text-center text-muted">Aucune commande sur cette période.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        </div>
+    </div>
+</div>
+
+{% if fosa_sans_commande %}
+<h2 class="h6">FOSA actives n'ayant jamais commandé <span class="badge bg-secondary">{{ nb_fosa_sans_commande }}</span></h2>
+<p class="text-muted small">À relancer en priorité — formations sanitaires dont le compte est activé mais qui n'ont encore jamais passé de commande.</p>
+<div class="table-responsive mb-4">
+<table class="table table-striped">
+    <thead><tr><th>Formation sanitaire</th><th>District</th></tr></thead>
+    <tbody>
+        {% for f in fosa_sans_commande %}
+        <tr>
+            <td>{{ f.nom }}</td>
+            <td>{{ f.district }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% if nb_fosa_sans_commande > 10 %}
+<p class="text-muted small">Et {{ nb_fosa_sans_commande|add:"-10" }} autres.</p>
+{% endif %}
+</div>
+{% endif %}
+
+<h2 class="h6">Statistiques détaillées</h2>
 <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-3 g-3">
     <div class="col">
         <a href="{% url 'statistiques:par_produit' %}" class="card text-decoration-none h-100">

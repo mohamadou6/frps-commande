@@ -38,7 +38,71 @@ def _reponse_xlsx(nom_fichier, entetes, lignes):
 
 @personnel_frps_required
 def index(request):
-    return render(request, "statistiques/index.html")
+    aujourd_hui = date.today()
+    debut_periode = aujourd_hui - timedelta(days=30)
+
+    commandes_periode = Commande.objects.filter(
+        statut__in=COMMANDES_EFFECTIVES,
+        date_confirmation__date__gte=debut_periode,
+        date_confirmation__date__lte=aujourd_hui,
+    )
+    nb_commandes_periode = commandes_periode.count()
+    montant_periode = commandes_periode.aggregate(total=Sum("montant_total"))["total"] or 0
+
+    produits_catalogue = Produit.objects.filter(magasin__in=[Magasin.PRINCIPAL, Magasin.UCPC])
+    nb_rupture = produits_catalogue.filter(stock_disponible=0).count()
+    nb_menace = (
+        LigneCommande.objects.filter(
+            produit__in=produits_catalogue.filter(stock_disponible__gt=0),
+            commande__statut__in=COMMANDES_EFFECTIVES,
+            commande__date_confirmation__date__gte=debut_periode,
+            commande__date_confirmation__date__lte=aujourd_hui,
+        )
+        .values("produit_id", "produit__stock_disponible")
+        .annotate(quantite=Sum("quantite"))
+        .filter(quantite__gte=F("produit__stock_disponible"))
+        .count()
+    )
+
+    fosa_actives = FormationSanitaire.objects.filter(user__is_active=True)
+    nb_fosa_actives = fosa_actives.count()
+    fosa_sans_commande = fosa_actives.exclude(commandes__statut__in=COMMANDES_EFFECTIVES).order_by("nom")
+    nb_fosa_sans_commande = fosa_sans_commande.count()
+
+    dernieres_commandes = (
+        Commande.objects.filter(statut__in=COMMANDES_EFFECTIVES)
+        .select_related("formation_sanitaire")
+        .order_by("-date_confirmation")[:10]
+    )
+
+    top_produits_periode = (
+        LigneCommande.objects.filter(
+            commande__statut__in=COMMANDES_EFFECTIVES,
+            commande__date_confirmation__date__gte=debut_periode,
+            commande__date_confirmation__date__lte=aujourd_hui,
+        )
+        .values("produit__nom")
+        .annotate(quantite=Sum("quantite"))
+        .order_by("-quantite")[:5]
+    )
+
+    return render(
+        request,
+        "statistiques/index.html",
+        {
+            "debut_periode": debut_periode,
+            "aujourd_hui": aujourd_hui,
+            "nb_commandes_periode": nb_commandes_periode,
+            "montant_periode": montant_periode,
+            "nb_rupture": nb_rupture,
+            "nb_menace": nb_menace,
+            "nb_fosa_actives": nb_fosa_actives,
+            "nb_fosa_sans_commande": nb_fosa_sans_commande,
+            "fosa_sans_commande": fosa_sans_commande[:10],
+            "dernieres_commandes": dernieres_commandes,
+            "top_produits_periode": top_produits_periode,
+        },
+    )
 
 
 @personnel_frps_required
