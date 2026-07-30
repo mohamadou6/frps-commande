@@ -65,7 +65,7 @@
 {% if user.is_authenticated %}
 <nav class="navbar navbar-expand-lg navbar-dark app-navbar mb-4">
     <div class="container">
-        <a class="navbar-brand text-white" href="{% if not user.is_formation_sanitaire %}{% url 'notifications:liste' %}{% else %}{% url 'catalogue:liste' %}{% endif %}">Bienvenue au FRPS-NO en Ligne</a>
+        <a class="navbar-brand text-white" href="{% if not user.is_formation_sanitaire %}{% url 'statistiques:index' %}{% else %}{% url 'catalogue:liste' %}{% endif %}">Bienvenue au FRPS-NO en Ligne</a>
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navPrincipale" aria-controls="navPrincipale" aria-expanded="false" aria-label="Ouvrir le menu">
             <span class="navbar-toggler-icon"></span>
         </button>
@@ -89,6 +89,7 @@
                 <a class="nav-link" href="{% url 'commandes:historique' %}">Mes commandes</a>
                 {% endif %}
                 {% if not user.is_formation_sanitaire %}
+                <a class="nav-link" href="{% url 'statistiques:index' %}">Tableau de bord</a>
                 <a class="nav-link" href="{% url 'notifications:liste' %}">
                     Notifications
                     {% if notifications_non_lues_count %}<span class="badge bg-danger">{{ notifications_non_lues_count }}</span>{% endif %}
@@ -98,8 +99,6 @@
                         Statistiques
                     </a>
                     <ul class="dropdown-menu">
-                        <li><a class="dropdown-item" href="{% url 'statistiques:index' %}">Tableau de bord</a></li>
-                        <li><hr class="dropdown-divider"></li>
                         <li><a class="dropdown-item" href="{% url 'statistiques:par_produit' %}">Par produit</a></li>
                         <li><a class="dropdown-item" href="{% url 'statistiques:par_district' %}">Par district</a></li>
                         <li><a class="dropdown-item" href="{% url 'statistiques:par_fosa' %}">Par formation sanitaire</a></li>

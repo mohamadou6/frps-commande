@@ -38,13 +38,12 @@ def _reponse_xlsx(nom_fichier, entetes, lignes):
 
 @personnel_frps_required
 def index(request):
-    aujourd_hui = date.today()
-    debut_periode = aujourd_hui - timedelta(days=30)
+    debut, fin = _periode_depuis_requete(request)
 
     commandes_periode = Commande.objects.filter(
         statut__in=COMMANDES_EFFECTIVES,
-        date_confirmation__date__gte=debut_periode,
-        date_confirmation__date__lte=aujourd_hui,
+        date_confirmation__date__gte=debut,
+        date_confirmation__date__lte=fin,
     )
     nb_commandes_periode = commandes_periode.count()
     montant_periode = commandes_periode.aggregate(total=Sum("montant_total"))["total"] or 0
@@ -55,8 +54,8 @@ def index(request):
         LigneCommande.objects.filter(
             produit__in=produits_catalogue.filter(stock_disponible__gt=0),
             commande__statut__in=COMMANDES_EFFECTIVES,
-            commande__date_confirmation__date__gte=debut_periode,
-            commande__date_confirmation__date__lte=aujourd_hui,
+            commande__date_confirmation__date__gte=debut,
+            commande__date_confirmation__date__lte=fin,
         )
         .values("produit_id", "produit__stock_disponible")
         .annotate(quantite=Sum("quantite"))
@@ -70,16 +69,14 @@ def index(request):
     nb_fosa_sans_commande = fosa_sans_commande.count()
 
     dernieres_commandes = (
-        Commande.objects.filter(statut__in=COMMANDES_EFFECTIVES)
-        .select_related("formation_sanitaire")
-        .order_by("-date_confirmation")[:10]
+        commandes_periode.select_related("formation_sanitaire").order_by("-date_confirmation")[:10]
     )
 
     top_produits_periode = (
         LigneCommande.objects.filter(
             commande__statut__in=COMMANDES_EFFECTIVES,
-            commande__date_confirmation__date__gte=debut_periode,
-            commande__date_confirmation__date__lte=aujourd_hui,
+            commande__date_confirmation__date__gte=debut,
+            commande__date_confirmation__date__lte=fin,
         )
         .values("produit__nom")
         .annotate(quantite=Sum("quantite"))
@@ -90,8 +87,8 @@ def index(request):
         request,
         "statistiques/index.html",
         {
-            "debut_periode": debut_periode,
-            "aujourd_hui": aujourd_hui,
+            "debut": debut,
+            "fin": fin,
             "nb_commandes_periode": nb_commandes_periode,
             "montant_periode": montant_periode,
             "nb_rupture": nb_rupture,
