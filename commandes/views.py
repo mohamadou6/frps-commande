@@ -61,6 +61,7 @@ def historique(request):
     commandes = (
         Commande.objects.filter(formation_sanitaire=request.user.formation_sanitaire)
         .exclude(statut=StatutCommande.BROUILLON)
+        .select_related("paiement")
         .order_by("-date_creation")
     )
     return render(request, "commandes/historique.html", {"commandes": commandes})
@@ -69,7 +70,9 @@ def historique(request):
 @formation_sanitaire_only_required
 def detail(request, commande_id):
     commande = get_object_or_404(
-        Commande, pk=commande_id, formation_sanitaire=request.user.formation_sanitaire
+        Commande.objects.select_related("paiement"),
+        pk=commande_id,
+        formation_sanitaire=request.user.formation_sanitaire,
     )
     return render(request, "commandes/detail.html", {"commande": commande})
 

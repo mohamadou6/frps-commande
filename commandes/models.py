@@ -34,6 +34,20 @@ class Commande(models.Model):
         self.save(update_fields=["montant_total"])
         return total
 
+    @property
+    def montant_paye(self):
+        paiement = getattr(self, "paiement", None)
+        return paiement.montant_paye if paiement else Decimal("0")
+
+    @property
+    def etat_paiement(self):
+        paiement = getattr(self, "paiement", None)
+        if paiement is None:
+            from paiements.models import EtatPaiement
+
+            return EtatPaiement.NON_PAYEE
+        return paiement.etat
+
 
 class LigneCommande(models.Model):
     commande = models.ForeignKey(Commande, on_delete=models.CASCADE, related_name="lignes")

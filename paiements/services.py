@@ -1,3 +1,5 @@
+from decimal import Decimal, InvalidOperation
+
 from django.utils import timezone
 
 from commandes.models import StatutCommande
@@ -55,3 +57,32 @@ def confirmer_paiement(paiement, succes: bool):
         # depuis son propre WhatsApp (voir commandes:telecharger_pdf).
 
     return paiement
+
+
+def mettre_a_jour_paiement(commande, montant_paye_brut, user):
+    """Saisie manuelle par le personnel comptabilité du montant reçu pour une
+    commande payée hors application (espèces). Ne touche pas au statut de la
+    commande (cycle de vie de la commande) : l'état de paiement est indépendant,
+    porté par Paiement.montant_paye/etat."""
+    if commande.statut not in (StatutCommande.CONFIRMEE, StatutCommande.PAYEE):
+        raise ValueError("Seule une commande confirmée peut avoir un état de paiement.")
+
+    try:
+        montant_paye = Decimal(str(montant_paye_brut).strip().replace(",", "."))
+    except (InvalidOperation, AttributeError):
+        raise ValueError("Montant invalide.")
+
+    if montant_paye < 0:
+        raise ValueError("Le montant payé ne peut pas être négatif.")
+    if montant_paye > commande.montant_total:
+        raise ValueError(f"Le montant payé ne peut pas dépasser le total de la commande ({commande.montant_total} FCFA).")
+
+    paiement, _ = Paiement.objects.get_or_create(
+        commande=commande,
+        defaults={"montant": commande.montant_total, "methode": MethodePaiement.ESPECES},
+    )
+    paiement.montant_paye = montant_paye
+    paiement.date_maj_paiement = timezone.now()
+    paiement.maj_par = user
+    paiement.save(update_fields=["montant_paye", "date_maj_paiement", "maj_par"])
+    return montant_paye

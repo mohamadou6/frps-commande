@@ -105,6 +105,7 @@
                         <li><a class="dropdown-item" href="{% url 'statistiques:stock' %}">Stock</a></li>
                     </ul>
                 </div>
+                <a class="nav-link" href="{% url 'paiements:gerer_paiements' %}">Paiements</a>
                 {% endif %}
                 <span class="user-pill">{{ user.formation_sanitaire.nom|default:user.username }}</span>
                 <form method="post" action="{% url 'logout' %}" class="mb-0">

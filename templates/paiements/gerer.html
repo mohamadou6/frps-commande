@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Gestion des paiements - Commande FRPS{% endblock %}
+{% block content %}
+<h1 class="h4 mb-3">Gestion des paiements</h1>
+<p class="text-muted small">
+    {% if user.is_admin_frps or user.is_personnel_comptabilite %}
+    Saisir le montant reçu pour une commande payée en espèces hors application. Une
+    commande peut être non payée, partiellement payée ou payée intégralement.
+    {% else %}
+    Consultation en lecture seule de l'état de paiement des commandes (non payée,
+    partiellement payée, payée intégralement).
+    {% endif %}
+</p>
+
+<form method="get" class="row g-2 mb-3">
+    <div class="col-auto flex-grow-1">
+        <input type="search" name="q" value="{{ query }}" placeholder="Rechercher une formation sanitaire..."
+               class="form-control" style="max-width: 400px;">
+    </div>
+    <div class="col-auto">
+        <button type="submit" class="btn btn-outline-primary">Rechercher</button>
+        {% if query %}
+        <a href="{% url 'paiements:gerer_paiements' %}" class="btn btn-outline-secondary">Réinitialiser</a>
+        {% endif %}
+    </div>
+</form>
+
+<div class="table-responsive">
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>#</th>
+            <th>Formation sanitaire</th>
+            <th>Date</th>
+            <th>Montant total</th>
+            <th>Montant payé</th>
+            <th>État</th>
+            {% if user.is_admin_frps or user.is_personnel_comptabilite %}<th></th>{% endif %}
+        </tr>
+    </thead>
+    <tbody>
+        {% for commande in commandes %}
+        <tr>
+            <td>{{ commande.id }}</td>
+            <td>{{ commande.formation_sanitaire.nom }}</td>
+            <td>{{ commande.date_confirmation|date:"d/m/Y H:i" }}</td>
+            <td>{{ commande.montant_total }} FCFA</td>
+            <td>{{ commande.montant_paye }} FCFA</td>
+            <td>
+                {% if commande.etat_paiement == "payee" %}
+                <span class="badge bg-success">Payée</span>
+                {% elif commande.etat_paiement == "partielle" %}
+                <span class="badge bg-warning text-dark">Partielle</span>
+                {% else %}
+                <span class="badge bg-secondary">Non payée</span>
+                {% endif %}
+            </td>
+            {% if user.is_admin_frps or user.is_personnel_comptabilite %}
+            <td><a href="{% url 'paiements:modifier_paiement' commande.id %}" class="btn btn-sm btn-outline-primary">Modifier</a></td>
+            {% endif %}
+        </tr>
+        {% empty %}
+        <tr><td colspan="7" class="text-center text-muted">Aucune commande confirmée pour le moment.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+</div>
+{% endblock %}

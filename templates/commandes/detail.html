@@ -3,6 +3,18 @@
 {% block content %}
 <h1 class="h4 mb-3">Commande #{{ commande.id }}</h1>
 <p>Statut : <span class="badge bg-secondary">{{ commande.get_statut_display }}</span></p>
+{% if commande.statut != "brouillon" %}
+<p>
+    État de paiement :
+    {% if commande.etat_paiement == "payee" %}
+    <span class="badge bg-success">Payée</span>
+    {% elif commande.etat_paiement == "partielle" %}
+    <span class="badge bg-warning text-dark">Partiellement payée ({{ commande.montant_paye }} / {{ commande.montant_total }} FCFA)</span>
+    {% else %}
+    <span class="badge bg-secondary">Non payée</span>
+    {% endif %}
+</p>
+{% endif %}
 <div class="table-responsive">
 <table class="table table-striped">
     <thead>

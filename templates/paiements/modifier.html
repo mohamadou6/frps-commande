@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Paiement commande #{{ commande.id }} - Commande FRPS{% endblock %}
+{% block content %}
+<h1 class="h4 mb-3">Paiement de la commande #{{ commande.id }}</h1>
+<p>{{ commande.formation_sanitaire.nom }} — {{ commande.date_confirmation|date:"d/m/Y H:i" }}</p>
+
+<div class="row row-cols-1 row-cols-sm-3 g-3 mb-4">
+    <div class="col">
+        <div class="border rounded-3 p-3 text-center">
+            <div class="text-muted small">Montant total</div>
+            <div class="fs-3 fw-bold">{{ commande.montant_total }} FCFA</div>
+        </div>
+    </div>
+    <div class="col">
+        <div class="border rounded-3 p-3 text-center">
+            <div class="text-muted small">Montant payé actuellement</div>
+            <div class="fs-3 fw-bold text-success">{{ commande.montant_paye }} FCFA</div>
+        </div>
+    </div>
+    <div class="col">
+        <div class="border rounded-3 p-3 text-center">
+            <div class="text-muted small">État</div>
+            <div class="fs-5 fw-bold">{{ commande.etat_paiement.label }}</div>
+        </div>
+    </div>
+</div>
+
+<form method="post" class="row g-2 align-items-end">
+    {% csrf_token %}
+    <div class="col-12 col-md-4">
+        <label class="form-label">Montant reçu (FCFA)</label>
+        <input type="number" step="0.01" min="0" max="{{ commande.montant_total }}" name="montant_paye"
+               value="{{ commande.montant_paye }}" class="form-control" required>
+    </div>
+    <div class="col-12 col-md-3">
+        <button type="submit" class="btn btn-primary w-100">Enregistrer</button>
+    </div>
+</form>
+
+<h2 class="h6 mt-4">Détail de la commande</h2>
+<div class="table-responsive">
+<table class="table table-striped">
+    <thead><tr><th>Produit</th><th>Quantité</th><th>Prix unitaire</th><th>Sous-total</th></tr></thead>
+    <tbody>
+        {% for ligne in commande.lignes.all %}
+        <tr>
+            <td>{{ ligne.produit.nom }}</td>
+            <td>{{ ligne.quantite }}</td>
+            <td>{{ ligne.prix_unitaire_snapshot }} FCFA</td>
+            <td>{{ ligne.sous_total }} FCFA</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+</div>
+<a href="{% url 'paiements:gerer_paiements' %}" class="btn btn-outline-secondary">Retour à la liste</a>
+{% endblock %}

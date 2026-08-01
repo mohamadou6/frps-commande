@@ -1,14 +1,24 @@
-# App en pause depuis le retrait de l'étape paiement du parcours FOSA (2026-07-26) :
+# Le paiement en ligne (Orange Money / espèces initiés par la FOSA) reste en pause
+# depuis le retrait de l'étape paiement du parcours FOSA (2026-07-26) :
 # confirmer_commande (commandes/views.py) mène directement au détail de la commande,
-# plus aucun lien de l'UI ne pointe vers ces vues. Gardées telles quelles pour un
-# usage interne FRPS futur si l'étape paiement est un jour réintroduite (voir aussi
-# accounts.models.Role.PERSONNEL_COMPTABILITE et notifications.services.notifier_paiement_confirme).
+# aucun lien de l'UI FOSA ne pointe vers payer/initier/payer_especes/confirmer_mock
+# ci-dessous (gardées pour un usage futur si cette étape est réintroduite).
+#
+# En revanche, depuis le 2026-07-31, le personnel comptabilité FRPS peut saisir
+# manuellement l'état de paiement d'une commande payée hors application (espèces
+# remises physiquement) via gerer_paiements/modifier_paiement ci-dessous — la FOSA le
+# voit ensuite en lecture seule sur le détail de sa commande, et le personnel stock
+# voit aussi la liste en lecture seule (pas d'accès à la modification).
 from django.conf import settings
 from django.contrib import messages
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
-from accounts.decorators import formation_sanitaire_only_required
+from accounts.decorators import (
+    comptabilite_frps_required,
+    formation_sanitaire_only_required,
+    personnel_frps_required,
+)
 from commandes.models import Commande, StatutCommande
 
 from . import services
@@ -91,3 +101,31 @@ def succes(request, commande_id):
         Commande, pk=commande_id, formation_sanitaire=request.user.formation_sanitaire
     )
     return render(request, "paiements/succes.html", {"commande": commande})
+
+
+@personnel_frps_required
+def gerer_paiements(request):
+    """Liste consultable par tout le personnel FRPS (stock inclus, en lecture) ; seule
+    la modification (modifier_paiement) reste réservée à comptabilité/admin."""
+    query = request.GET.get("q", "").strip()
+    commandes = (
+        Commande.objects.filter(statut__in=[StatutCommande.CONFIRMEE, StatutCommande.PAYEE])
+        .select_related("formation_sanitaire", "paiement")
+        .order_by("-date_confirmation")
+    )
+    if query:
+        commandes = commandes.filter(formation_sanitaire__nom__icontains=query)
+    return render(request, "paiements/gerer.html", {"commandes": commandes, "query": query})
+
+
+@comptabilite_frps_required
+def modifier_paiement(request, commande_id):
+    commande = get_object_or_404(Commande, pk=commande_id)
+    if request.method == "POST":
+        try:
+            montant_paye = services.mettre_a_jour_paiement(commande, request.POST.get("montant_paye"), request.user)
+            messages.success(request, f"État de paiement mis à jour : {montant_paye} FCFA reçus.")
+            return redirect("paiements:gerer_paiements")
+        except ValueError as exc:
+            messages.error(request, str(exc))
+    return render(request, "paiements/modifier.html", {"commande": commande})

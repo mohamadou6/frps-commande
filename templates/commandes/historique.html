@@ -5,7 +5,7 @@
 <div class="table-responsive">
 <table class="table table-striped">
     <thead>
-        <tr><th>#</th><th>Date</th><th>Statut</th><th>Montant</th><th></th></tr>
+        <tr><th>#</th><th>Date</th><th>Statut</th><th>Montant</th><th>Paiement</th><th></th></tr>
     </thead>
     <tbody>
         {% for commande in commandes %}
@@ -14,10 +14,19 @@
             <td>{{ commande.date_creation|date:"d/m/Y H:i" }}</td>
             <td><span class="badge bg-secondary">{{ commande.get_statut_display }}</span></td>
             <td>{{ commande.montant_total }} FCFA</td>
+            <td>
+                {% if commande.etat_paiement == "payee" %}
+                <span class="badge bg-success">Payée</span>
+                {% elif commande.etat_paiement == "partielle" %}
+                <span class="badge bg-warning text-dark">Partielle</span>
+                {% else %}
+                <span class="badge bg-secondary">Non payée</span>
+                {% endif %}
+            </td>
             <td><a href="{% url 'commandes:detail' commande.id %}" class="btn btn-sm btn-outline-primary">Détail</a></td>
         </tr>
         {% empty %}
-        <tr><td colspan="5" class="text-center text-muted">Aucune commande passée pour le moment.</td></tr>
+        <tr><td colspan="6" class="text-center text-muted">Aucune commande passée pour le moment.</td></tr>
         {% endfor %}
     </tbody>
 </table>
