@@ -98,18 +98,27 @@ def generer_pdf_commande(commande) -> bytes:
         )
 
     pdf.ln(4)
-    pdf.set_font("Helvetica", "B", 11)
-    pdf.cell(90, 8, "Produit", border=1)
-    pdf.cell(25, 8, "Quantité", border=1, align="C")
-    pdf.cell(35, 8, "Prix unit.", border=1, align="R")
-    pdf.cell(35, 8, "Sous-total", border=1, align="R", new_x="LMARGIN", new_y="NEXT")
-
     pdf.set_font("Helvetica", "", 10)
-    for ligne in commande.lignes.select_related("produit"):
-        pdf.cell(90, 8, ligne.produit.nom, border=1)
-        pdf.cell(25, 8, str(ligne.quantite), border=1, align="C")
-        pdf.cell(35, 8, f"{ligne.prix_unitaire_snapshot} FCFA", border=1, align="R")
-        pdf.cell(35, 8, f"{ligne.sous_total} FCFA", border=1, align="R", new_x="LMARGIN", new_y="NEXT")
+    # `table()` (et non `cell()`) pour que les noms de produits longs passent à la ligne
+    # dans la colonne Produit au lieu de déborder sur la colonne Quantité.
+    with pdf.table(
+        width=185,  # même largeur totale que la ligne "Total" ci-dessous
+        col_widths=(90, 25, 35, 35),
+        align="LEFT",
+        text_align=("LEFT", "CENTER", "RIGHT", "RIGHT"),
+        line_height=6,
+        padding=1,
+        repeat_headings=1,  # ré-affiche l'en-tête si la table continue page suivante
+    ) as table:
+        entete = table.row()
+        for titre in ("Produit", "Quantité", "Prix unit.", "Sous-total"):
+            entete.cell(titre)
+        for ligne in commande.lignes.select_related("produit"):
+            rangee = table.row()
+            rangee.cell(ligne.produit.nom)
+            rangee.cell(str(ligne.quantite))
+            rangee.cell(f"{ligne.prix_unitaire_snapshot} FCFA")
+            rangee.cell(f"{ligne.sous_total} FCFA")
 
     pdf.ln(2)
     pdf.set_font("Helvetica", "B", 12)
