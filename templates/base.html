@@ -9,6 +9,19 @@
     <link rel="manifest" href="{% url 'manifeste' %}">
     <link rel="apple-touch-icon" href="{% static 'img/apple-touch-icon.png' %}">
     <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="FRPS-NO">
+    <script>
+        // Capté ici, dans le <head> : Chrome émet cet évènement très tôt, souvent
+        // avant que les scripts de fin de page ne soient exécutés. Sans cela,
+        // l'invitation à installer serait perdue et le bouton ne s'afficherait jamais.
+        window.__inviteInstallation = null;
+        window.addEventListener("beforeinstallprompt", function (evenement) {
+            evenement.preventDefault();
+            window.__inviteInstallation = evenement;
+            document.dispatchEvent(new Event("frps:installable"));
+        });
+    </script>
     <title>{% block title %}Commande FRPS{% endblock %}</title>
     {% comment %}
     Bootstrap hébergé en local (et non sur un CDN) : sur le réseau intermittent des
@@ -124,6 +137,23 @@
     </div>
 </nav>
 {% endif %}
+{% comment %}
+Bandeau d'installation. Sans lui, installer l'application suppose d'aller chercher
+« Installer l'application » dans le menu du navigateur — que personne ne trouve —
+et, sur iPhone, aucune proposition automatique n'existe.
+{% endcomment %}
+<div id="bandeau-installation" class="container mt-3" hidden>
+    <div class="alert alert-success d-flex flex-wrap align-items-center justify-content-between gap-2 mb-0">
+        <span id="texte-installation">
+            Installez l'application sur votre téléphone : elle s'ouvre plus vite et
+            reste consultable même sans connexion.
+        </span>
+        <span class="text-nowrap">
+            <button type="button" class="btn btn-success btn-sm" id="bouton-installer">Installer</button>
+            <button type="button" class="btn btn-sm btn-link text-secondary" id="bouton-ignorer-installation">Plus tard</button>
+        </span>
+    </div>
+</div>
 <div class="{% block container_class %}container{% endblock %}">
     {% for message in messages %}
         <div class="alert alert-{{ message.tags }}">{{ message }}</div>
@@ -178,6 +208,62 @@ if ("serviceWorker" in navigator) {
         }).catch(function () { /* navigateur trop ancien ou contexte non sécurisé */ });
     });
 }
+
+// Bandeau d'installation : affiché seulement si l'application n'est pas déjà
+// installée et que l'utilisateur ne l'a pas écarté.
+(function () {
+    var bandeau = document.getElementById("bandeau-installation");
+    if (!bandeau) return;
+    var texte = document.getElementById("texte-installation");
+    var boutonInstaller = document.getElementById("bouton-installer");
+    var boutonIgnorer = document.getElementById("bouton-ignorer-installation");
+    var CLE_REFUS = "frps-installation-ecartee";
+
+    function memoire(cle, valeur) {
+        // localStorage lève une exception en navigation privée sur certains mobiles.
+        try {
+            if (valeur === undefined) return window.localStorage.getItem(cle);
+            window.localStorage.setItem(cle, valeur);
+        } catch (e) { return null; }
+    }
+
+    var dejaInstallee = window.matchMedia("(display-mode: standalone)").matches
+        || navigator.standalone === true;
+    if (dejaInstallee || memoire(CLE_REFUS) === "1") return;
+
+    function afficher() { bandeau.hidden = false; }
+
+    boutonIgnorer.addEventListener("click", function () {
+        memoire(CLE_REFUS, "1");
+        bandeau.hidden = true;
+    });
+
+    window.addEventListener("appinstalled", function () {
+        memoire(CLE_REFUS, "1");
+        bandeau.hidden = true;
+    });
+
+    if (/iphone|ipad|ipod/i.test(navigator.userAgent)) {
+        // Safari n'expose aucune invitation programmable : on décrit le geste.
+        texte.textContent = "Pour installer l'application : touchez le bouton Partager, puis « Sur l'écran d'accueil ».";
+        boutonInstaller.hidden = true;
+        afficher();
+        return;
+    }
+
+    boutonInstaller.addEventListener("click", function () {
+        var invite = window.__inviteInstallation;
+        if (!invite) return;
+        invite.prompt();
+        invite.userChoice.then(function () {
+            window.__inviteInstallation = null;
+            bandeau.hidden = true;
+        });
+    });
+
+    if (window.__inviteInstallation) afficher();
+    document.addEventListener("frps:installable", afficher);
+})();
 </script>
 </body>
 </html>
