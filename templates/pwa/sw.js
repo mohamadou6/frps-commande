@@ -3,7 +3,7 @@
 // URL hachées réelles, et ce fichier change dès qu'un fichier statique change —
 // ce qui suffit au navigateur pour détecter une mise à jour.
 
-const VERSION = "v1";
+const VERSION = "v2";
 const CACHE_COQUILLE = "frps-coquille-" + VERSION; // ressources fixes de l'app
 const CACHE_PAGES = "frps-pages-" + VERSION; // pages HTML déjà consultées
 const PAGE_HORS_LIGNE = "{% url 'hors_ligne' %}";
@@ -23,10 +23,22 @@ const RESSOURCES_COQUILLE = [
     "{% static 'statistiques/js/combobox.js' %}",
 ];
 
-// Jamais interceptées : l'admin Django, et les pages d'authentification dont le
-// jeton CSRF doit toujours être frais (un 403 au premier login sur mobile a déjà
-// été corrigé une fois par un `never_cache`, ne pas le réintroduire par le cache).
-const HORS_PERIMETRE = [/^\/admin\//, /^\/login\/?$/, /^\/logout\/?$/];
+// Jamais interceptées :
+// - l'admin Django ;
+// - les pages d'authentification, dont le jeton CSRF doit toujours être frais (un 403
+//   au premier login sur mobile a déjà été corrigé une fois par un `never_cache`, ne
+//   pas le réintroduire par le cache) ;
+// - les téléchargements (PDF de bon de commande). Un clic sur un lien de
+//   téléchargement est une *navigation* : la faire passer par `respondWith()` casse
+//   la gestion du `Content-Disposition: attachment` sur Android, et le PDF, généré à
+//   la volée, dépasse volontiers le délai réseau.
+const HORS_PERIMETRE = [
+    /^\/admin\//,
+    /^\/login\/?$/,
+    /^\/logout\/?$/,
+    /\/telecharger(-staff)?\/$/,
+    /\/pdf\//,
+];
 
 self.addEventListener("install", (event) => {
     event.waitUntil(
@@ -66,6 +78,8 @@ self.addEventListener("fetch", (event) => {
     const url = new URL(requete.url);
     if (url.origin !== self.location.origin) return;
     if (HORS_PERIMETRE.some((motif) => motif.test(url.pathname))) return;
+    // Exports Excel des statistiques : ce sont des téléchargements, pas des pages.
+    if (url.searchParams.has("export")) return;
 
     // Fichiers statiques : leur nom contient un hachage du contenu, ils sont donc
     // immuables et peuvent être servis depuis le cache sans risque de péremption.
@@ -77,7 +91,7 @@ self.addEventListener("fetch", (event) => {
     // Pages : réseau d'abord (stock et jeton CSRF doivent être à jour), repli sur
     // la dernière version consultée, puis sur la page « hors ligne ».
     if (requete.mode === "navigate") {
-        event.respondWith(reseauDabord(requete));
+        event.respondWith(reseauDabord(event));
     }
 });
 
@@ -91,30 +105,55 @@ async function cacheDabord(requete) {
     return reponse;
 }
 
-async function reseauDabord(requete) {
+async function reseauDabord(event) {
+    const requete = event.request;
     const cache = await caches.open(CACHE_PAGES);
-    try {
-        const reponse = await avecDelaiMaximum(requete);
-        const type = reponse.headers.get("Content-Type") || "";
-        // On ne met en cache que du HTML : surtout pas les PDF de bon de commande.
-        if (reponse.ok && type.includes("text/html")) {
-            cache.put(requete, reponse.clone());
+    const reseau = fetch(requete);
+    const enCache = await cache.match(requete);
+
+    if (enCache) {
+        // Une version consultable existe déjà : inutile de faire patienter la FOSA
+        // plus de quelques secondes, on l'affiche et la page se rafraîchira à la
+        // prochaine ouverture, une fois la requête arrivée à son terme.
+        try {
+            const reponse = await avecDelaiMaximum(reseau, DELAI_RESEAU_MS);
+            mettreEnCache(cache, requete, reponse);
+            return reponse;
+        } catch (erreur) {
+            event.waitUntil(
+                reseau.then((reponse) => mettreEnCache(cache, requete, reponse)).catch(() => {})
+            );
+            return enCache;
         }
+    }
+
+    // Rien en cache : abandonner au bout de quelques secondes ne servirait à rien
+    // (il n'y a pas de solution de repli à afficher), on laisse donc le réseau aller
+    // à son terme, si lent soit-il.
+    try {
+        const reponse = await reseau;
+        mettreEnCache(cache, requete, reponse);
         return reponse;
     } catch (erreur) {
-        const enCache = await cache.match(requete);
-        if (enCache) return enCache;
         return (await caches.match(PAGE_HORS_LIGNE)) || Response.error();
     }
 }
 
-function avecDelaiMaximum(requete) {
+// On ne met en cache que du HTML : jamais un PDF ni un export Excel.
+function mettreEnCache(cache, requete, reponse) {
+    const type = reponse.headers.get("Content-Type") || "";
+    if (reponse.ok && type.includes("text/html")) {
+        cache.put(requete, reponse.clone());
+    }
+}
+
+function avecDelaiMaximum(promesse, delai) {
     return new Promise((resoudre, rejeter) => {
-        const minuteur = setTimeout(() => rejeter(new Error("delai depasse")), DELAI_RESEAU_MS);
-        fetch(requete).then(
-            (reponse) => {
+        const minuteur = setTimeout(() => rejeter(new Error("delai depasse")), delai);
+        promesse.then(
+            (valeur) => {
                 clearTimeout(minuteur);
-                resoudre(reponse);
+                resoudre(valeur);
             },
             (erreur) => {
                 clearTimeout(minuteur);
