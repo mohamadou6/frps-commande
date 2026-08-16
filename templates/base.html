@@ -10,8 +10,10 @@
     <link rel="apple-touch-icon" href="{% static 'img/apple-touch-icon.png' %}">
     <meta name="mobile-web-app-capable" content="yes">
     <title>{% block title %}Commande FRPS{% endblock %}</title>
-    {# Bootstrap hébergé en local (et non sur un CDN) : sur le réseau intermittent des
-       FOSA, un CDN injoignable affichait l'application sans aucune mise en forme. #}
+    {% comment %}
+    Bootstrap hébergé en local (et non sur un CDN) : sur le réseau intermittent des
+    FOSA, un CDN injoignable affichait l'application sans aucune mise en forme.
+    {% endcomment %}
     <link href="{% static 'vendor/bootstrap/bootstrap.min.css' %}" rel="stylesheet">
     <style>
         @media (max-width: 991.98px) {
