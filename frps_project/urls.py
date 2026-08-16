@@ -15,6 +15,7 @@ urlpatterns = [
     path('sw.js', pwa.service_worker, name='service_worker'),
     path('manifest.webmanifest', pwa.manifeste, name='manifeste'),
     path('hors-ligne/', pwa.hors_ligne, name='hors_ligne'),
+    path('.well-known/assetlinks.json', pwa.assetlinks, name='assetlinks'),
     path('', RedirectView.as_view(pattern_name='catalogue:liste', permanent=False)),
     path('login/', LoginView.as_view(template_name='accounts/login.html'), name='login'),
     path('logout/', auth_views.LogoutView.as_view(), name='logout'),
