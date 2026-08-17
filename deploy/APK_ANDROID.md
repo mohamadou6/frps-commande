@@ -22,6 +22,10 @@ installée depuis le navigateur — c'est le même moteur, le même service work
   Sa configuration est `twa-manifest.json` : identifiant `com.frpsno.commande`,
   nom « FRPS Nord en Ligne », lanceur « FRPS-NO », thème vert `#0F9D58`, icônes
   reprises du manifeste en ligne, orientation portrait, version 1.0.0.
+- **Chaîne vérifiée** : Gradle 8.11.1 démarre correctement avec le JDK 17 depuis
+  PowerShell, et le projet généré porte bien `applicationId com.frpsno.commande`,
+  `hostName frpsno.com`, `launchUrl /`, version 1.0.0. Il ne manque que les
+  `build-tools`, bloqués par la licence de l'étape 1.
 - **Côté serveur Django** : la route `/.well-known/assetlinks.json` existe
   (`frps_project/pwa.py`). Elle renvoie 404 tant que l'empreinte du certificat de
   signature n'est pas connue — voir étape 3.
