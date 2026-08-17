@@ -41,8 +41,11 @@ Les outils de compilation ne s'installent pas tant que la licence Google n'est p
 acceptée. Ouvre **PowerShell** et lance :
 
 ```bash
-& "$env:USERPROFILE\.bubblewrap\android_sdk\tools\bin\sdkmanager.bat" --licenses
+$env:JAVA_HOME = "$env:USERPROFILE\.bubblewrap\jdk\jdk-17.0.11+9"; & "$env:USERPROFILE\.bubblewrap\android_sdk\tools\bin\sdkmanager.bat" --licenses
 ```
+
+`JAVA_HOME` est indispensable : `sdkmanager` ne connaît pas le JDK installé par
+Bubblewrap et échoue sinon sur `ERROR: JAVA_HOME is not set`.
 
 Réponds `y` à chaque question. C'est un accord juridique entre Google et toi, d'où
 le fait que je ne l'aie pas accepté moi-même.
@@ -50,7 +53,7 @@ le fait que je ne l'aie pas accepté moi-même.
 ### Étape 2 — créer la clé de signature et construire l'APK
 
 ```bash
-cd "C:\Users\DELL\Documents\Project claude online\frps-apk"; bubblewrap build
+$env:JAVA_HOME = "$env:USERPROFILE\.bubblewrap\jdk\jdk-17.0.11+9"; cd "C:\Users\DELL\Documents\Project claude online\frps-apk"; bubblewrap build
 ```
 
 Bubblewrap constate que `android.keystore` n'existe pas et propose de le créer. Il
