@@ -77,8 +77,18 @@ ce sont ceux déclarés dans `twa-manifest.json`.
 ### Étape 2b — construire l'APK signé
 
 ```bash
-$env:JAVA_HOME = "$env:USERPROFILE\.bubblewrap\jdk\jdk-17.0.11+9"; $env:NoDefaultCurrentDirectoryInExePath = $null; cd "C:\Users\DELL\Documents\Project claude online\frps-apk"; bubblewrap build
+$env:JAVA_HOME = "$env:USERPROFILE\.bubblewrap\jdk\jdk-17.0.11+9"; $env:NoDefaultCurrentDirectoryInExePath = $null; cd "C:\Users\DELL\Documents\Project claude online\frps-apk"; & "$env:APPDATA\npm\bubblewrap.cmd" build --skipPwaValidation
 ```
+
+Deux précautions supplémentaires dans cette commande :
+
+- **appel par chemin complet** (`$env:APPDATA\npm\bubblewrap.cmd`) : une fenêtre
+  PowerShell ouverte avant l'installation de Bubblewrap n'a pas le dossier des
+  commandes npm dans son `PATH` et répond `Le terme «bubblewrap» n'est pas
+  reconnu`. Le chemin complet fonctionne dans tous les cas ;
+- **`--skipPwaValidation`** : sans cette option, Bubblewrap soumet le site à l'API
+  Google PageSpeed Insights, qui répond couramment `429 Too Many Requests` et fait
+  échouer le build. Cette validation ne conditionne en rien la qualité de l'APK.
 
 `NoDefaultCurrentDirectoryInExePath` vaut `1` sur cette machine, ce qui empêche
 `cmd` d'exécuter un programme du dossier courant. Or Bubblewrap lance
