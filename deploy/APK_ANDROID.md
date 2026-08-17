@@ -41,11 +41,15 @@ Les outils de compilation ne s'installent pas tant que la licence Google n'est p
 acceptée. Ouvre **PowerShell** et lance :
 
 ```bash
-$env:JAVA_HOME = "$env:USERPROFILE\.bubblewrap\jdk\jdk-17.0.11+9"; & "$env:USERPROFILE\.bubblewrap\android_sdk\tools\bin\sdkmanager.bat" --licenses
+$env:JAVA_HOME = "$env:USERPROFILE\.bubblewrap\jdk\jdk-17.0.11+9"; & "$env:USERPROFILE\.bubblewrap\android_sdk\tools\bin\sdkmanager.bat" --sdk_root="$env:USERPROFILE\.bubblewrap\android_sdk" --licenses
 ```
 
-`JAVA_HOME` est indispensable : `sdkmanager` ne connaît pas le JDK installé par
-Bubblewrap et échoue sinon sur `ERROR: JAVA_HOME is not set`.
+Les deux ajouts sont indispensables, chacun corrigeant une erreur distincte :
+
+- sans `JAVA_HOME`, `sdkmanager` ne connaît pas le JDK installé par Bubblewrap et
+  s'arrête sur `ERROR: JAVA_HOME is not set` ;
+- sans `--sdk_root`, il n'arrive pas à déduire l'emplacement du SDK et échoue sur
+  `Warning: Could not create settings` suivi d'une `IllegalArgumentException`.
 
 Réponds `y` à chaque question. C'est un accord juridique entre Google et toi, d'où
 le fait que je ne l'aie pas accepté moi-même.
