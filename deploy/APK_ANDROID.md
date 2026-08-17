@@ -119,12 +119,19 @@ Le build produit `app-release-signed.apk` dans le même dossier — c'est le fic
 
 `app-release-signed.apk` (1,4 Mo) et `app-release-bundle.aab` ont été produits.
 Signature vérifiée avec `apksigner verify --print-certs` :
-`CN=MOHAMADOU IBRAHIMA, OU=FRPS-NO, O=FRPS-NO, L=GAROUA`.
+`CN=MOHAMADOU IBRAHIMA, OU=FRPS-NO, O=FRPS-NO, L=GAROUA, ST=NORD, C=CM`.
+
+La clé a été **recréée** le 2026-08-17 : la première portait `C=NO` au lieu de
+`CM`, le code pays étant gravé dans le certificat et non modifiable. L'opération a
+été faite avant toute distribution, donc sans conséquence — recréer la clé après
+diffusion aurait obligé les FOSA à désinstaller puis réinstaller l'application,
+Android considérant une signature différente comme une application différente.
+L'ancienne clé est conservée sous `android.keystore.ancien`, sans usage.
 
 Empreinte SHA-256 du certificat, au format attendu par `assetlinks.json` :
 
 ```
-F5:87:4E:97:6B:C4:AE:19:AD:C0:C2:36:A0:C4:D3:7F:44:58:CF:C0:1A:A3:B6:17:6E:73:73:61:A6:B3:B0:2D
+D6:3F:62:59:0F:FB:49:09:E5:0B:F3:5D:F3:CF:A0:C8:35:A2:E0:5D:23:1F:70:4B:63:52:F5:90:1D:50:E9:E1
 ```
 
 Elle se retrouve à tout moment sans mot de passe, à partir de l'APK :
