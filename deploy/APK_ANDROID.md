@@ -54,7 +54,27 @@ Les deux ajouts sont indispensables, chacun corrigeant une erreur distincte :
 Réponds `y` à chaque question. C'est un accord juridique entre Google et toi, d'où
 le fait que je ne l'aie pas accepté moi-même.
 
-### Étape 2 — créer la clé de signature et construire l'APK
+### Étape 2a — créer la clé de signature
+
+`bubblewrap build` demande bien un mot de passe, mais **ne crée pas** le fichier
+`android.keystore` : c'est `bubblewrap init` qui s'en charge normalement, or cette
+étape a été contournée (voir « Écueils » plus bas). La clé se crée donc à part,
+avec `keytool`, livré avec le JDK :
+
+```bash
+cd "C:\Users\DELL\Documents\Project claude online\frps-apk"; & "$env:USERPROFILE\.bubblewrap\jdk\jdk-17.0.11+9\bin\keytool.exe" -genkeypair -v -keystore android.keystore -alias android -keyalg RSA -keysize 2048 -validity 10000
+```
+
+Questions posées, dans l'ordre : mot de passe (deux fois), nom, unité
+organisationnelle, organisation, ville, région, code pays sur 2 lettres, puis une
+confirmation, puis le mot de passe de la clé (Entrée pour reprendre le même).
+Réponses possibles : `FRPS Nord`, `GIP-FRPS NORD`, `Garoua`, `Nord`, `CM`. Ces
+valeurs n'ont aucune conséquence fonctionnelle.
+
+Le nom de fichier `android.keystore` et l'alias `android` doivent être respectés :
+ce sont ceux déclarés dans `twa-manifest.json`.
+
+### Étape 2b — construire l'APK signé
 
 ```bash
 $env:JAVA_HOME = "$env:USERPROFILE\.bubblewrap\jdk\jdk-17.0.11+9"; $env:NoDefaultCurrentDirectoryInExePath = $null; cd "C:\Users\DELL\Documents\Project claude online\frps-apk"; bubblewrap build
