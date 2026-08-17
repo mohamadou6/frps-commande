@@ -115,6 +115,24 @@ et clé). Note-le et conserve-le.
 Le build produit `app-release-signed.apk` dans le même dossier — c'est le fichier
 à envoyer aux FOSA.
 
+### Étapes 1, 2a et 2b : FAITES le 2026-08-17
+
+`app-release-signed.apk` (1,4 Mo) et `app-release-bundle.aab` ont été produits.
+Signature vérifiée avec `apksigner verify --print-certs` :
+`CN=MOHAMADOU IBRAHIMA, OU=FRPS-NO, O=FRPS-NO, L=GAROUA`.
+
+Empreinte SHA-256 du certificat, au format attendu par `assetlinks.json` :
+
+```
+F5:87:4E:97:6B:C4:AE:19:AD:C0:C2:36:A0:C4:D3:7F:44:58:CF:C0:1A:A3:B6:17:6E:73:73:61:A6:B3:B0:2D
+```
+
+Elle se retrouve à tout moment sans mot de passe, à partir de l'APK :
+
+```bash
+cd "C:\Users\DELL\Documents\Project claude online\frps-apk"; & "$env:USERPROFILE\.bubblewrap\android_sdk\build-tools\35.0.0\apksigner.bat" verify --print-certs .\app-release-signed.apk
+```
+
 ### Étape 3 — publier l'empreinte du certificat
 
 Sans cette étape, l'application s'ouvrira **avec la barre d'adresse du navigateur
