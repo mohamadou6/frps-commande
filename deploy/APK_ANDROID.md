@@ -57,8 +57,19 @@ le fait que je ne l'aie pas accepté moi-même.
 ### Étape 2 — créer la clé de signature et construire l'APK
 
 ```bash
-$env:JAVA_HOME = "$env:USERPROFILE\.bubblewrap\jdk\jdk-17.0.11+9"; cd "C:\Users\DELL\Documents\Project claude online\frps-apk"; bubblewrap build
+$env:JAVA_HOME = "$env:USERPROFILE\.bubblewrap\jdk\jdk-17.0.11+9"; $env:NoDefaultCurrentDirectoryInExePath = $null; cd "C:\Users\DELL\Documents\Project claude online\frps-apk"; bubblewrap build
 ```
+
+`NoDefaultCurrentDirectoryInExePath` vaut `1` sur cette machine, ce qui empêche
+`cmd` d'exécuter un programme du dossier courant. Or Bubblewrap lance
+`gradlew.bat` sans préfixe de chemin : sans cette neutralisation, le build échoue
+sur `'gradlew.bat' n'est pas reconnu`. La variable n'est modifiée que pour la
+session PowerShell en cours, rien n'est changé sur le système.
+
+Cette commande **sans** `--skipSigning` a été validée dans sa version non signée :
+le build aboutit et produit `app-release-unsigned-aligned.apk` (1,3 Mo) ainsi que
+le bundle `app/build/outputs/bundle/release/app-release.aab`. Seule l'étape de
+signature reste donc à faire.
 
 Bubblewrap constate que `android.keystore` n'existe pas et propose de le créer. Il
 demande alors **un mot de passe, à choisir par toi** (deux fois : magasin de clés
@@ -110,5 +121,13 @@ incrémenter `appVersion` et `appVersionCode` dans `twa-manifest.json`, relancer
   bien qu'alimenter les réponses par un tube n'en fait passer qu'une seule. C'est
   pourquoi `twa-manifest.json` a été écrit à la main puis appliqué avec
   `bubblewrap update`, qui, lui, ne pose aucune question.
-- **Lancer le build depuis Git Bash échoue** (`'gradlew.bat' n'est pas reconnu`).
-  Utiliser PowerShell ou l'invite de commandes Windows.
+- **`'gradlew.bat' n'est pas reconnu`** : ce n'est pas un problème de shell (l'erreur
+  se produit aussi depuis PowerShell) mais la variable d'environnement
+  `NoDefaultCurrentDirectoryInExePath=1`, qui interdit à `cmd` d'exécuter un
+  programme du dossier courant. Voir l'étape 2.
+- **`Could not initialize native services` de Gradle** : erreur transitoire observée
+  une fois, causée par un démon Gradle concurrent resté d'une tentative précédente.
+  Relancer suffit.
+- **Ne pas filtrer la sortie du build avec `Select-Object -Last N`** : en cas
+  d'échec, seule la fin de la pile d'appels est conservée et le message de cause
+  disparaît. Rediriger vers un fichier (`| Out-File build.log`) puis le lire.
