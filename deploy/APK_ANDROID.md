@@ -126,7 +126,8 @@ La clé a été **recréée** le 2026-08-17 : la première portait `C=NO` au lie
 été faite avant toute distribution, donc sans conséquence — recréer la clé après
 diffusion aurait obligé les FOSA à désinstaller puis réinstaller l'application,
 Android considérant une signature différente comme une application différente.
-L'ancienne clé est conservée sous `android.keystore.ancien`, sans usage.
+L'ancienne clé a été supprimée : `frps-apk/android.keystore` est désormais la
+seule, et il n'y a plus d'ambiguïté sur le fichier à sauvegarder.
 
 Empreinte SHA-256 du certificat, au format attendu par `assetlinks.json` :
 
