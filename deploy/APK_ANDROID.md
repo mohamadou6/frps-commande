@@ -82,10 +82,12 @@ $env:JAVA_HOME = "$env:USERPROFILE\.bubblewrap\jdk\jdk-17.0.11+9"; $env:NoDefaul
 
 Deux précautions supplémentaires dans cette commande :
 
-- **appel par chemin complet** (`$env:APPDATA\npm\bubblewrap.cmd`) : une fenêtre
-  PowerShell ouverte avant l'installation de Bubblewrap n'a pas le dossier des
-  commandes npm dans son `PATH` et répond `Le terme «bubblewrap» n'est pas
-  reconnu`. Le chemin complet fonctionne dans tous les cas ;
+- **appel direct du script Node, en chemins absolus** : `bubblewrap` seul échoue si
+  la fenêtre PowerShell a été ouverte avant l'installation (dossier des commandes
+  npm absent du `PATH`), et le raccourci `bubblewrap.cmd` a lui aussi été rejeté
+  par `CommandNotFoundException` sur cette machine alors que le fichier existe
+  bien — vraisemblablement une restriction d'exécution des `.cmd`. Passer par
+  `node.exe` avec le chemin du script contourne les deux ;
 - **`--skipPwaValidation`** : sans cette option, Bubblewrap soumet le site à l'API
   Google PageSpeed Insights, qui répond couramment `429 Too Many Requests` et fait
   échouer le build. Cette validation ne conditionne en rien la qualité de l'APK.
