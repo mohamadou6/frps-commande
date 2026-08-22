@@ -3,6 +3,8 @@ from pathlib import Path
 from django.core.signing import BadSignature, SignatureExpired, TimestampSigner
 from fpdf import FPDF
 
+from frps_project.formatage import formater_montant, formater_prix
+
 _PDF_SIGNER = TimestampSigner(salt="commande-pdf")
 _PDF_TOKEN_MAX_AGE = 60 * 60 * 24 * 7  # 7 jours
 
@@ -117,12 +119,12 @@ def generer_pdf_commande(commande) -> bytes:
             rangee = table.row()
             rangee.cell(ligne.produit.nom)
             rangee.cell(str(ligne.quantite))
-            rangee.cell(f"{ligne.prix_unitaire_snapshot} FCFA")
-            rangee.cell(f"{ligne.sous_total} FCFA")
+            rangee.cell(f"{formater_prix(ligne.prix_unitaire_snapshot)} FCFA")
+            rangee.cell(f"{formater_montant(ligne.sous_total)} FCFA")
 
     pdf.ln(2)
     pdf.set_font("Helvetica", "B", 12)
     pdf.cell(150, 10, "Total", border=1, align="R")
-    pdf.cell(35, 10, f"{commande.montant_total} FCFA", border=1, align="R")
+    pdf.cell(35, 10, f"{formater_montant(commande.montant_total)} FCFA", border=1, align="R")
 
     return bytes(pdf.output())

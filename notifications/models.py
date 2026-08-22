@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 
 
@@ -21,6 +22,19 @@ class SMSLog(models.Model):
     )
     date_envoi = models.DateTimeField(auto_now_add=True)
     detail_erreur = models.TextField(blank=True)
+
+    # statut_envoi ci-dessus ne reflète que l'acceptation de la requête par la
+    # passerelle (ex: Orange répond 201 même si le SMS n'est jamais livré, voir
+    # notifications/backends.py). Les deux champs suivants portent le VRAI statut
+    # de livraison, reçu de façon asynchrone via le callback Delivery Receipt (DR)
+    # d'Orange (voir views.orange_dr_callback) — vides tant qu'aucun DR n'est reçu.
+    reference_externe = models.CharField(
+        max_length=100, blank=True, help_text="resource_id (Orange) ou SID (Twilio) renvoyé par la passerelle"
+    )
+    statut_livraison = models.CharField(
+        max_length=32, blank=True, help_text="Statut brut reçu du callback DR (ex: DeliveredToTerminal, DeliveryImpossible)"
+    )
+    date_statut_livraison = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         verbose_name = "SMS envoyé"
@@ -71,3 +85,22 @@ class Notification(models.Model):
 
     def __str__(self):
         return self.message
+
+
+class PushSubscription(models.Model):
+    """Abonnement Web Push d'un navigateur/appareil (PWA ou APK installé) pour un
+    utilisateur : permet une notification instantanée si l'appareil est en ligne,
+    livrée dès la reconnexion sinon (géré par le service de push, pas par nous)."""
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="push_subscriptions")
+    endpoint = models.URLField(max_length=500, unique=True)
+    p256dh = models.CharField(max_length=255)
+    auth = models.CharField(max_length=255)
+    date_creation = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Abonnement push"
+        verbose_name_plural = "Abonnements push"
+
+    def __str__(self):
+        return f"Abonnement push de {self.user}"

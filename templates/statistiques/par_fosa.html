@@ -63,7 +63,7 @@ document.addEventListener("DOMContentLoaded", function () {
     <div class="col">
         <div class="border rounded-3 p-3 text-center">
             <div class="text-muted small">Montant total</div>
-            <div class="fs-3 fw-bold">{{ resultat.montant_total|default:0 }} FCFA</div>
+            <div class="fs-3 fw-bold">{{ resultat.montant_total|default:0|floatformat:"0" }} FCFA</div>
         </div>
     </div>
 </div>

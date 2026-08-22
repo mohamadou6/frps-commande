@@ -61,7 +61,7 @@ document.addEventListener("DOMContentLoaded", function () {
     <div class="col">
         <div class="border rounded-3 p-3 text-center">
             <div class="text-muted small">Montant total</div>
-            <div class="fs-3 fw-bold">{{ resultat.montant_total|default:0 }} FCFA</div>
+            <div class="fs-3 fw-bold">{{ resultat.montant_total|default:0|floatformat:"0" }} FCFA</div>
         </div>
     </div>
     <div class="col">
@@ -81,7 +81,7 @@ document.addEventListener("DOMContentLoaded", function () {
         <tr>
             <td>{{ ligne.formation_sanitaire__nom }}</td>
             <td>{{ ligne.nb_commandes }}</td>
-            <td>{{ ligne.montant }} FCFA</td>
+            <td>{{ ligne.montant|floatformat:"0" }} FCFA</td>
             <td>
                 <a href="{% url 'statistiques:par_fosa' %}?fosa={{ ligne.formation_sanitaire_id }}&debut={{ debut }}&fin={{ fin }}"
                    class="btn btn-sm btn-outline-primary">Voir le détail</a>

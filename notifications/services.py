@@ -4,6 +4,8 @@ from django.conf import settings
 from django.db.models import Q
 from django.urls import reverse
 
+from frps_project.formatage import formater_montant
+
 from .backends import get_sms_backend
 from .models import Notification, SMSLog, StatutEnvoi, TypeEvenement, WhatsAppLog
 from .whatsapp import get_whatsapp_backend
@@ -23,13 +25,14 @@ def _envoyer_a_destinataires(destinataires, message, type_evenement, commande=No
         if not numero:
             continue
         try:
-            backend.send(numero, message)
+            reference_externe = backend.send(numero, message)
             SMSLog.objects.create(
                 destinataire=numero,
                 message=message,
                 type_evenement=type_evenement,
                 statut_envoi=StatutEnvoi.ENVOYE,
                 commande=commande,
+                reference_externe=reference_externe or "",
             )
         except Exception as exc:  # noqa: BLE001 - on journalise toute erreur d'envoi
             SMSLog.objects.create(
@@ -54,7 +57,7 @@ def _construire_message(entete, commande, cloture):
     lignes = list(commande.lignes.select_related("produit"))
 
     prefixe = _sans_accents(f"{entete} {commande.formation_sanitaire.nom}: ")
-    suffixe = _sans_accents(f". Total {commande.montant_total} FCFA. {cloture}")
+    suffixe = _sans_accents(f". Total {formater_montant(commande.montant_total)} FCFA. {cloture}")
     items_texte = [_sans_accents(f"{ligne.produit.nom} x{ligne.quantite}") for ligne in lignes]
 
     # Essai avec le détail complet : si ça tient dans un segment, on garde tel quel.
@@ -94,10 +97,11 @@ def _formatter_lignes_complet(commande):
 def notifier_nouvelle_commande(commande):
     from accounts.models import Role, User
 
-    # L'admin FRPS supervise tout : il reçoit aussi les SMS destinés au personnel_stock.
-    numeros = User.objects.filter(
-        Q(role=Role.PERSONNEL_STOCK) | Q(role=Role.ADMIN), is_active=True
-    ).exclude(telephone="").values_list("telephone", flat=True)
+    from .push import envoyer_push_aux_utilisateurs
+
+    # L'admin FRPS supervise tout : il reçoit aussi les SMS/push destinés au personnel_stock.
+    destinataires = User.objects.filter(Q(role=Role.PERSONNEL_STOCK) | Q(role=Role.ADMIN), is_active=True)
+    numeros = destinataires.exclude(telephone="").values_list("telephone", flat=True)
 
     message = _construire_message(f"Cde #{commande.pk}", commande, "Editer la Facture sur Sage.")
     _envoyer_a_destinataires(numeros, message, TypeEvenement.NOUVELLE_COMMANDE, commande=commande)
@@ -108,8 +112,14 @@ def notifier_nouvelle_commande(commande):
         commande=commande,
         message=(
             f"Nouvelle commande #{commande.pk} de {commande.formation_sanitaire.nom} : "
-            f"{_formatter_lignes_complet(commande)}. Total : {commande.montant_total} FCFA."
+            f"{_formatter_lignes_complet(commande)}. Total : {formater_montant(commande.montant_total)} FCFA."
         ),
+    )
+    envoyer_push_aux_utilisateurs(
+        destinataires,
+        f"Nouvelle commande #{commande.pk}",
+        f"{commande.formation_sanitaire.nom} - {formater_montant(commande.montant_total)} FCFA",
+        url="/notifications/",
     )
 
 
@@ -120,10 +130,11 @@ def notifier_paiement_confirme(commande):
     pour un usage interne futur si l'étape paiement est un jour réintroduite."""
     from accounts.models import Role, User
 
-    # L'admin FRPS supervise tout : il reçoit aussi les SMS destinés au personnel_comptabilite.
-    numeros = User.objects.filter(
-        Q(role=Role.PERSONNEL_COMPTABILITE) | Q(role=Role.ADMIN), is_active=True
-    ).exclude(telephone="").values_list("telephone", flat=True)
+    from .push import envoyer_push_aux_utilisateurs
+
+    # L'admin FRPS supervise tout : il reçoit aussi les SMS/push destinés au personnel_comptabilite.
+    destinataires = User.objects.filter(Q(role=Role.PERSONNEL_COMPTABILITE) | Q(role=Role.ADMIN), is_active=True)
+    numeros = destinataires.exclude(telephone="").values_list("telephone", flat=True)
 
     message = _construire_message(f"Paiement recu #{commande.pk}", commande, "Recu SVP.")
     _envoyer_a_destinataires(numeros, message, TypeEvenement.PAIEMENT_CONFIRME, commande=commande)
@@ -134,8 +145,14 @@ def notifier_paiement_confirme(commande):
         commande=commande,
         message=(
             f"Paiement reçu pour la commande #{commande.pk} de {commande.formation_sanitaire.nom} : "
-            f"{_formatter_lignes_complet(commande)}. Total : {commande.montant_total} FCFA."
+            f"{_formatter_lignes_complet(commande)}. Total : {formater_montant(commande.montant_total)} FCFA."
         ),
+    )
+    envoyer_push_aux_utilisateurs(
+        destinataires,
+        f"Paiement reçu #{commande.pk}",
+        f"{commande.formation_sanitaire.nom} - {formater_montant(commande.montant_total)} FCFA",
+        url="/notifications/",
     )
 
 
@@ -151,7 +168,7 @@ def notifier_commande_validee_whatsapp(commande):
     filename = f"commande_{commande.pk}.pdf"
     caption = (
         f"Commande #{commande.pk} validée - {commande.formation_sanitaire.nom} "
-        f"({commande.montant_total} FCFA)"
+        f"({formater_montant(commande.montant_total)} FCFA)"
     )
     token = generer_token_pdf(commande.pk)
     chemin_pdf = reverse("commandes:pdf", args=[commande.pk, token])

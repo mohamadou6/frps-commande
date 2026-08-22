@@ -13,7 +13,7 @@
             <td>{{ commande.id }}</td>
             <td>{{ commande.date_creation|date:"d/m/Y H:i" }}</td>
             <td><span class="badge bg-secondary">{{ commande.get_statut_display }}</span></td>
-            <td>{{ commande.montant_total }} FCFA</td>
+            <td>{{ commande.montant_total|floatformat:"0" }} FCFA</td>
             <td>
                 {% if commande.etat_paiement == "payee" %}
                 <span class="badge bg-success">Payée</span>

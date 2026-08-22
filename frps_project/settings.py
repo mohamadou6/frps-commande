@@ -120,6 +120,10 @@ TIME_ZONE = 'Africa/Douala'
 
 USE_I18N = True
 
+# Affiche tous les nombres avec un separateur de milliers (espace en fr-fr) dans
+# les templates, ex. 1 000 000 au lieu de 1000000.
+USE_THOUSAND_SEPARATOR = True
+
 USE_TZ = True
 
 
@@ -162,6 +166,11 @@ ORANGE_SMS_SENDER_ADDRESS = env("ORANGE_SMS_SENDER_ADDRESS", default="")
 # une fois le sender name personnalisé validé par Orange). Optionnel.
 ORANGE_SMS_SENDER_NAME = env("ORANGE_SMS_SENDER_NAME", default="")
 
+# --- MTN Developer (produit "SMS V2") : meilleure délivrabilité vers les numéros MTN Cameroun ---
+MTN_SMS_CLIENT_ID = env("MTN_SMS_CLIENT_ID", default="")
+MTN_SMS_CLIENT_SECRET = env("MTN_SMS_CLIENT_SECRET", default="")
+MTN_SMS_SENDER_ADDRESS = env("MTN_SMS_SENDER_ADDRESS", default="")
+
 PAYMENT_GATEWAY = env("PAYMENT_GATEWAY", default="mock")
 ORANGE_MONEY_API_URL = env("ORANGE_MONEY_API_URL", default="")
 ORANGE_MONEY_MERCHANT_KEY = env("ORANGE_MONEY_MERCHANT_KEY", default="")
@@ -180,6 +189,31 @@ TWILIO_ACCOUNT_SID = env("TWILIO_ACCOUNT_SID", default="")
 TWILIO_AUTH_TOKEN = env("TWILIO_AUTH_TOKEN", default="")
 TWILIO_WHATSAPP_FROM = env("TWILIO_WHATSAPP_FROM", default="whatsapp:+14155238886")
 TWILIO_SMS_FROM = env("TWILIO_SMS_FROM", default="")
+
+# --- Notifications push (Web Push) ---
+# Identité du serveur pour les navigateurs/services de push (FCM sur Android).
+# Clé privée stockée avec des \n échappés (une seule ligne dans .env / Render) ;
+# `.replace` la reconvertit en PEM valide.
+VAPID_PUBLIC_KEY = env("VAPID_PUBLIC_KEY", default="")
+VAPID_PRIVATE_KEY = env("VAPID_PRIVATE_KEY", default="").replace("\\n", "\n")
+VAPID_CLAIMS_EMAIL = env("VAPID_CLAIMS_EMAIL", default="mailto:contact@frpsno.com")
+
+# --- Email (rapports périodiques) ---
+# "console" par défaut (imprime l'email dans les logs, aucun envoi réel — pratique en
+# local/dev) ; passer à "smtp" avec les identifiants d'un fournisseur (ex: Brevo,
+# smtp-relay.brevo.com:587) pour un envoi réel.
+EMAIL_BACKEND_MODE = env("EMAIL_BACKEND_MODE", default="console")
+EMAIL_BACKEND = (
+    "django.core.mail.backends.smtp.EmailBackend"
+    if EMAIL_BACKEND_MODE == "smtp"
+    else "django.core.mail.backends.console.EmailBackend"
+)
+EMAIL_HOST = env("EMAIL_HOST", default="smtp-relay.brevo.com")
+EMAIL_PORT = env.int("EMAIL_PORT", default=587)
+EMAIL_HOST_USER = env("EMAIL_HOST_USER", default="")
+EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", default="")
+EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS", default=True)
+DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="rapports@frpsno.com")
 
 
 # --- Sécurité production ---

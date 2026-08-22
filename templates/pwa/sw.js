@@ -71,6 +71,42 @@ self.addEventListener("message", (event) => {
     }
 });
 
+// Notification push (voir notifications/push.py) : s'affiche même app/onglet
+// fermé, tant que l'appareil est en ligne au moment de la reception. Si
+// l'appareil est hors ligne, le service de push (FCM sur Android/Chrome) la
+// retient et la livre dès la reconnexion — comportement natif, rien à coder ici.
+self.addEventListener("push", (event) => {
+    let donnees = {titre: "FRPS Nord en Ligne", corps: "Nouvelle notification", url: "/"};
+    if (event.data) {
+        try { donnees = event.data.json(); } catch (e) { donnees.corps = event.data.text(); }
+    }
+    event.waitUntil(
+        self.registration.showNotification(donnees.titre, {
+            body: donnees.corps,
+            icon: "{% static 'img/icon-192.png' %}",
+            badge: "{% static 'img/icon-192.png' %}",
+            data: {url: donnees.url || "/"},
+        })
+    );
+});
+
+self.addEventListener("notificationclick", (event) => {
+    event.notification.close();
+    const url = event.notification.data && event.notification.data.url ? event.notification.data.url : "/";
+    event.waitUntil(
+        (async () => {
+            const clients = await self.clients.matchAll({type: "window", includeUncontrolled: true});
+            for (const client of clients) {
+                if (client.url.includes(self.location.origin) && "focus" in client) {
+                    client.navigate(url);
+                    return client.focus();
+                }
+            }
+            return self.clients.openWindow(url);
+        })()
+    );
+});
+
 self.addEventListener("fetch", (event) => {
     const requete = event.request;
     if (requete.method !== "GET") return;

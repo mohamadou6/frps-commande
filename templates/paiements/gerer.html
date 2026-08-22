@@ -44,8 +44,8 @@
             <td>{{ commande.id }}</td>
             <td>{{ commande.formation_sanitaire.nom }}</td>
             <td>{{ commande.date_confirmation|date:"d/m/Y H:i" }}</td>
-            <td>{{ commande.montant_total }} FCFA</td>
-            <td>{{ commande.montant_paye }} FCFA</td>
+            <td>{{ commande.montant_total|floatformat:"0" }} FCFA</td>
+            <td>{{ commande.montant_paye|floatformat:"0" }} FCFA</td>
             <td>
                 {% if commande.etat_paiement == "payee" %}
                 <span class="badge bg-success">Payée</span>

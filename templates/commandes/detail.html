@@ -9,7 +9,7 @@
     {% if commande.etat_paiement == "payee" %}
     <span class="badge bg-success">Payée</span>
     {% elif commande.etat_paiement == "partielle" %}
-    <span class="badge bg-warning text-dark">Partiellement payée ({{ commande.montant_paye }} / {{ commande.montant_total }} FCFA)</span>
+    <span class="badge bg-warning text-dark">Partiellement payée ({{ commande.montant_paye|floatformat:"0" }} / {{ commande.montant_total|floatformat:"0" }} FCFA)</span>
     {% else %}
     <span class="badge bg-secondary">Non payée</span>
     {% endif %}
@@ -22,7 +22,7 @@
         {% for reglement in commande.paiement.reglements.all %}
         <tr>
             <td>{{ reglement.date_reglement|date:"d/m/Y H:i" }}</td>
-            <td>{{ reglement.montant }} FCFA</td>
+            <td>{{ reglement.montant|floatformat:"0" }} FCFA</td>
             <td>{{ reglement.get_methode_display }}</td>
         </tr>
         {% endfor %}
@@ -42,18 +42,18 @@
             <td>{{ ligne.produit.nom }}</td>
             <td>{{ ligne.quantite }}</td>
             <td>{{ ligne.prix_unitaire_snapshot }} FCFA</td>
-            <td>{{ ligne.sous_total }} FCFA</td>
+            <td>{{ ligne.sous_total|floatformat:"0" }} FCFA</td>
         </tr>
         {% endfor %}
     </tbody>
 </table>
 </div>
-<h2 class="h5">Total : {{ commande.montant_total }} FCFA</h2>
+<h2 class="h5">Total : {{ commande.montant_total|floatformat:"0" }} FCFA</h2>
 <div class="d-flex gap-2 flex-wrap">
     {% if commande.statut != "brouillon" %}
     <a href="{% url 'commandes:telecharger_pdf' commande.id %}" class="btn btn-outline-secondary">Télécharger le PDF</a>
     <button type="button" class="btn btn-success"
-            onclick="partagerPdfWhatsApp('{% url 'commandes:telecharger_pdf' commande.id %}', 'commande_{{ commande.id }}.pdf', 'Commande #{{ commande.id }} - {{ commande.formation_sanitaire.nom }} ({{ commande.montant_total }} FCFA)', this)">
+            onclick="partagerPdfWhatsApp('{% url 'commandes:telecharger_pdf' commande.id %}', 'commande_{{ commande.id }}.pdf', 'Commande #{{ commande.id }} - {{ commande.formation_sanitaire.nom }} ({{ commande.montant_total|floatformat:"0" }} FCFA)', this)">
         Partager par WhatsApp
     </button>
     {% endif %}

@@ -1,13 +1,13 @@
 from django.contrib import admin
 
-from .models import Notification, SMSLog, WhatsAppLog
+from .models import Notification, PushSubscription, SMSLog, WhatsAppLog
 
 
 @admin.register(SMSLog)
 class SMSLogAdmin(admin.ModelAdmin):
-    list_display = ("destinataire", "type_evenement", "statut_envoi", "commande", "date_envoi")
-    list_filter = ("type_evenement", "statut_envoi")
-    search_fields = ("destinataire", "message")
+    list_display = ("destinataire", "type_evenement", "statut_envoi", "statut_livraison", "commande", "date_envoi")
+    list_filter = ("type_evenement", "statut_envoi", "statut_livraison")
+    search_fields = ("destinataire", "message", "reference_externe")
     readonly_fields = [f.name for f in SMSLog._meta.fields]
 
     def has_add_permission(self, request):
@@ -31,6 +31,16 @@ class NotificationAdmin(admin.ModelAdmin):
     list_filter = ("role_cible", "type_evenement", "lu")
     search_fields = ("message",)
     readonly_fields = ("role_cible", "type_evenement", "commande", "message", "date_creation")
+
+    def has_add_permission(self, request):
+        return False
+
+
+@admin.register(PushSubscription)
+class PushSubscriptionAdmin(admin.ModelAdmin):
+    list_display = ("user", "endpoint", "date_creation")
+    search_fields = ("user__username", "endpoint")
+    readonly_fields = ("user", "endpoint", "p256dh", "auth", "date_creation")
 
     def has_add_permission(self, request):
         return False
