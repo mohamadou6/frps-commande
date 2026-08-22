@@ -63,11 +63,33 @@
             transform: translateY(-1px);
         }
         .app-navbar .user-pill {
-            color: rgba(255, 255, 255, 0.85);
+            display: inline-flex;
+            align-items: center;
+            gap: .5rem;
+            color: #0b7a45;
+            font-weight: 700;
             font-size: .875rem;
-            padding: .3rem .7rem;
+            padding: .25rem .9rem .25rem .25rem;
             border-radius: 999px;
-            background: rgba(255, 255, 255, 0.1);
+            background: #ffffff;
+            box-shadow: 0 3px 10px -3px rgba(6, 60, 35, 0.5);
+        }
+        .app-navbar .user-avatar {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 1.8rem;
+            height: 1.8rem;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #0f9d58, #17a768);
+            color: #fff;
+            font-weight: 700;
+            font-size: .8rem;
+            flex-shrink: 0;
+        }
+        .app-navbar .user-role {
+            font-size: 1rem;
+            line-height: 1;
         }
         .app-navbar .btn-outline-light {
             border-radius: 999px;
@@ -85,7 +107,7 @@
 {% if user.is_authenticated %}
 <nav class="navbar navbar-expand-lg navbar-dark app-navbar mb-4">
     <div class="container">
-        <a class="navbar-brand text-white" href="{% if not user.is_formation_sanitaire %}{% url 'statistiques:index' %}{% else %}{% url 'catalogue:liste' %}{% endif %}">Bienvenue au FRPS-NO en Ligne</a>
+        <a class="navbar-brand text-white" href="{% if not user.is_formation_sanitaire %}{% url 'statistiques:index' %}{% else %}{% url 'catalogue:liste' %}{% endif %}">💊 Bienvenue au FRPS-NO en Ligne</a>
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navPrincipale" aria-controls="navPrincipale" aria-expanded="false" aria-label="Ouvrir le menu">
             <span class="navbar-toggler-icon"></span>
         </button>
@@ -94,40 +116,46 @@
                 {% if user.is_admin_frps %}
                 <div class="dropdown">
                     <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                        Catalogue
+                        📦 Catalogue
                     </a>
                     <ul class="dropdown-menu">
-                        <li><a class="dropdown-item" href="{% url 'catalogue:liste' %}">Voir le catalogue</a></li>
-                        <li><a class="dropdown-item" href="{% url 'catalogue:importer' %}">Importer les produits</a></li>
+                        <li><a class="dropdown-item" href="{% url 'catalogue:liste' %}">👀 Voir le catalogue</a></li>
+                        <li><a class="dropdown-item" href="{% url 'catalogue:importer' %}">📥 Importer les produits</a></li>
                     </ul>
                 </div>
                 {% elif user.is_formation_sanitaire %}
-                <a class="nav-link" href="{% url 'catalogue:liste' %}">Catalogue</a>
+                <a class="nav-link" href="{% url 'catalogue:liste' %}">📦 Catalogue</a>
                 {% endif %}
                 {% if user.is_formation_sanitaire %}
-                <a class="nav-link" href="{% url 'commandes:panier' %}">Panier</a>
-                <a class="nav-link" href="{% url 'commandes:historique' %}">Mes commandes</a>
+                <a class="nav-link" href="{% url 'commandes:panier' %}">🛒 Panier</a>
+                <a class="nav-link" href="{% url 'commandes:historique' %}">🧾 Mes commandes</a>
                 {% endif %}
                 {% if not user.is_formation_sanitaire %}
-                <a class="nav-link" href="{% url 'statistiques:index' %}">Tableau de bord</a>
+                <a class="nav-link" href="{% url 'statistiques:index' %}">📊 Tableau de bord</a>
                 <a class="nav-link" href="{% url 'notifications:liste' %}">
-                    Notifications
+                    🔔 Notifications
                     {% if notifications_non_lues_count %}<span class="badge bg-danger">{{ notifications_non_lues_count }}</span>{% endif %}
                 </a>
                 <div class="dropdown">
                     <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                        Statistiques
+                        📈 Statistiques
                     </a>
                     <ul class="dropdown-menu">
-                        <li><a class="dropdown-item" href="{% url 'statistiques:par_produit' %}">Par produit</a></li>
-                        <li><a class="dropdown-item" href="{% url 'statistiques:par_district' %}">Par district</a></li>
-                        <li><a class="dropdown-item" href="{% url 'statistiques:par_fosa' %}">Par formation sanitaire</a></li>
-                        <li><a class="dropdown-item" href="{% url 'statistiques:stock' %}">Stock</a></li>
+                        <li><a class="dropdown-item" href="{% url 'statistiques:par_produit' %}">💊 Par produit</a></li>
+                        <li><a class="dropdown-item" href="{% url 'statistiques:par_district' %}">🗺️ Par district</a></li>
+                        <li><a class="dropdown-item" href="{% url 'statistiques:par_fosa' %}">🏥 Par formation sanitaire</a></li>
+                        <li><a class="dropdown-item" href="{% url 'statistiques:stock' %}">📦 Stock</a></li>
                     </ul>
                 </div>
-                <a class="nav-link" href="{% url 'paiements:gerer_paiements' %}">Paiements</a>
+                <a class="nav-link" href="{% url 'paiements:gerer_paiements' %}">💳 Paiements</a>
                 {% endif %}
-                <span class="user-pill">{{ user.formation_sanitaire.nom|default:user.username }}</span>
+                <span class="user-pill">
+                    <span class="user-avatar">{{ user.formation_sanitaire.nom|default:user.username|first|upper }}</span>
+                    {{ user.formation_sanitaire.nom|default:user.username }}
+                    <span class="user-role">
+                        {% if user.is_formation_sanitaire %}🏥{% elif user.is_admin_frps %}⭐{% elif user.is_personnel_comptabilite %}💰{% else %}📦{% endif %}
+                    </span>
+                </span>
                 <form method="post" action="{% url 'logout' %}" class="mb-0">
                     {% csrf_token %}
                     <button class="btn btn-sm btn-outline-light" type="submit">Déconnexion</button>
@@ -157,7 +185,7 @@ et, sur iPhone, aucune proposition automatique n'existe.
 {% if user.is_authenticated and not user.is_formation_sanitaire and vapid_public_key %}
 <div id="bandeau-notifications" class="container mt-3" hidden>
     <div class="alert alert-info d-flex flex-wrap align-items-center justify-content-between gap-2 mb-0">
-        <span>Activez les notifications : soyez alerté immédiatement (nouvelle commande, paiement) même appli fermée.</span>
+        <span>Activez les notifications : soyez alerté immédiatement des évènements qui vous concernent, même appli fermée.</span>
         <span class="text-nowrap">
             <button type="button" class="btn btn-primary btn-sm" id="bouton-activer-notifications">Activer</button>
             <button type="button" class="btn btn-sm btn-link text-secondary" id="bouton-ignorer-notifications">Plus tard</button>
