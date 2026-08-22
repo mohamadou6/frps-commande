@@ -101,6 +101,50 @@
         font-size: 1.05rem;
     }
     .produit-card form { margin-top: auto; }
+
+    /* Bouton d'ajout façon marchand en ligne : pilule, léger dégradé, ombre
+       portée et enfoncement au clic. Volontairement en bleu et non dans le vert
+       de la marque, pour qu'il tranche comme action principale de la carte. */
+    .btn-ajouter {
+        background: linear-gradient(180deg, #3d9bee 0%, #1a73c7 100%);
+        border: 1px solid #1663ad;
+        color: #fff;
+        font-weight: 600;
+        border-radius: 999px;
+        padding: .42rem 1.1rem;
+        box-shadow: 0 2px 6px -1px rgba(16, 74, 128, .45);
+        transition: filter .15s ease, box-shadow .15s ease, transform .06s ease;
+    }
+    .btn-ajouter:hover {
+        filter: brightness(1.07);
+        color: #fff;
+        box-shadow: 0 4px 10px -2px rgba(16, 74, 128, .55);
+    }
+    .btn-ajouter:focus-visible {
+        outline: 3px solid rgba(61, 155, 238, .45);
+        outline-offset: 1px;
+        color: #fff;
+    }
+    .btn-ajouter:active {
+        transform: translateY(1px);
+        box-shadow: inset 0 2px 4px rgba(0, 0, 0, .22);
+    }
+    .btn-ajouter:disabled {
+        background: #b9c6d2;
+        border-color: #a8b6c4;
+        box-shadow: none;
+    }
+    /* Champ quantité assorti : même hauteur, mêmes angles arrondis. */
+    .produit-card .quantite-input {
+        border-radius: 999px;
+        text-align: center;
+        font-weight: 600;
+        border-color: #cfe0d6;
+    }
+    .produit-card .quantite-input:focus {
+        border-color: #3d9bee;
+        box-shadow: 0 0 0 .2rem rgba(61, 155, 238, .2);
+    }
     .produit-au-panier {
         font-size: .8rem;
         font-weight: 600;
@@ -183,9 +227,9 @@
                     <form method="post" action="{% url 'commandes:ajouter' produit.id %}" class="d-flex gap-2">
                         {% csrf_token %}
                         <input type="number" name="quantite" min="1" max="{{ produit.stock_disponible }}" value="1"
-                               class="form-control form-control-sm" style="max-width: 90px;"
+                               class="form-control form-control-sm quantite-input" style="max-width: 78px;"
                                {% if produit.stock_disponible == 0 %}disabled{% endif %}>
-                        <button type="submit" class="btn btn-sm btn-primary flex-grow-1" {% if produit.stock_disponible == 0 %}disabled{% endif %}>
+                        <button type="submit" class="btn btn-sm btn-ajouter flex-grow-1" {% if produit.stock_disponible == 0 %}disabled{% endif %}>
                             Ajouter
                         </button>
                     </form>
