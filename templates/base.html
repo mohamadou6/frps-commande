@@ -404,6 +404,15 @@ if ("serviceWorker" in navigator) {
         return;
     }
 
+    // Le bandeau parlait du téléphone même sur ordinateur, où la phrase n'a pas de
+    // sens. Le texte du gabarit reste celui du mobile, majoritaire chez les FOSA.
+    var surMobile = window.matchMedia("(pointer: coarse)").matches
+        || /android|iphone|ipad|ipod|mobile/i.test(navigator.userAgent);
+    if (!surMobile) {
+        texte.textContent = "Installez l'application sur cet ordinateur : elle s'ouvre "
+            + "plus vite et reste consultable même sans connexion.";
+    }
+
     boutonInstaller.addEventListener("click", function () {
         var invite = window.__inviteInstallation;
         if (!invite) return;

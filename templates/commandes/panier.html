@@ -63,7 +63,16 @@
 <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-2">
     <h2 class="h5">Total : {{ commande.montant_total|floatformat:"0" }} FCFA</h2>
     {% if commande.lignes.all %}
-    <form method="post" action="{% url 'commandes:confirmer' %}">
+    {% comment %}
+    Garde-fou sur une action irréversible : confirmer débite le stock, verrouille la
+    commande et notifie le FRPS, et annuler ensuite impose de recréditer le stock à la
+    main. On passe par confirm() natif plutôt qu'une fenêtre Bootstrap : si le
+    JavaScript n'a pas fini de charger sur le réseau lent d'une FOSA, le formulaire
+    part quand même — là où un bouton d'ouverture de fenêtre resterait inerte et
+    empêcherait purement et simplement de commander.
+    {% endcomment %}
+    <form method="post" action="{% url 'commandes:confirmer' %}"
+          onsubmit="return confirm('Confirmer cette commande de {{ commande.montant_total|floatformat:"0" }} FCFA ({{ commande.lignes.count }} produit{{ commande.lignes.count|pluralize }}) ?\n\nLe stock sera debite et le FRPS notifie. Cette action est definitive.');">
         {% csrf_token %}
         <button type="submit" class="btn btn-success">Confirmer la commande</button>
     </form>
