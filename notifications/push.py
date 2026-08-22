@@ -7,6 +7,12 @@ from pywebpush import WebPushException, webpush
 
 logger = logging.getLogger("notifications.push")
 
+# Sans ce parametre, pywebpush envoie un TTL de 0s ("livrer maintenant ou
+# abandonner") : un appareil hors ligne au moment de l'envoi ne recevrait
+# jamais la notification, meme en se reconnectant ensuite - a l'oppose du
+# SMS. 7 jours pour laisser le temps a un personnel absent le week-end.
+_TTL_SECONDES = 7 * 24 * 60 * 60
+
 
 def _vapid():
     """py_vapid n'accepte pas directement une chaine PEM (voir Vapid.from_string,
@@ -36,6 +42,7 @@ def envoyer_push_a_utilisateur(user, titre, corps, url="/"):
                 data=charge_utile,
                 vapid_private_key=vapid,
                 vapid_claims={"sub": settings.VAPID_CLAIMS_EMAIL},
+                ttl=_TTL_SECONDES,
             )
         except WebPushException as exc:
             statut = exc.response.status_code if exc.response is not None else None
