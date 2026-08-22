@@ -7,6 +7,26 @@ class Magasin(models.TextChoices):
     AUTRE = "autre", "Autre magasin (non affiché dans le catalogue)"
 
 
+class Rayon(models.Model):
+    """Rayon de classification du catalogue (ex. Injectables, Comprimés).
+    Peuplé/rattaché aux produits via la commande import_rayons, depuis
+    catalogue/data/rayons_classification.csv.
+    """
+
+    slug = models.SlugField(max_length=64, unique=True)
+    nom = models.CharField(max_length=100)
+    icone = models.CharField(max_length=8, blank=True, help_text="Emoji affiché à côté du nom du rayon")
+    ordre = models.PositiveSmallIntegerField(default=0)
+
+    class Meta:
+        verbose_name = "Rayon"
+        verbose_name_plural = "Rayons"
+        ordering = ["ordre", "nom"]
+
+    def __str__(self):
+        return self.nom
+
+
 class Produit(models.Model):
     """Catalogue saisi et maintenu manuellement par l'admin FRPS via l'admin Django
     (prix/stock consultés dans Sage par l'admin, saisis ici à la main — pas de
@@ -26,6 +46,9 @@ class Produit(models.Model):
     )
     actif = models.BooleanField(default=True, help_text="Désactivé automatiquement si absent du dernier import")
     derniere_synchro = models.DateTimeField(auto_now=True)
+    rayon = models.ForeignKey(
+        Rayon, on_delete=models.SET_NULL, null=True, blank=True, related_name="produits"
+    )
 
     class Meta:
         verbose_name = "Produit"

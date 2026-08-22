@@ -2,23 +2,49 @@ import unicodedata
 from decimal import Decimal, InvalidOperation
 
 from django.contrib import messages
+from django.db import models
 from django.shortcuts import render
 from openpyxl import load_workbook
 
 from accounts.decorators import admin_frps_required, formation_sanitaire_required
 
-from .models import Magasin, Produit
+from .models import Magasin, Produit, Rayon
 
 
 @formation_sanitaire_required
 def liste(request):
     query = request.GET.get("q", "").strip()
-    produits = Produit.objects.filter(
+    rayon_slug = request.GET.get("rayon", "").strip()
+
+    produits_visibles = Produit.objects.filter(
         actif=True, magasin__in=[Magasin.PRINCIPAL, Magasin.UCPC], stock_disponible__gt=0
-    ).order_by("nom")
+    )
+
+    rayons = list(
+        Rayon.objects.filter(produits__in=produits_visibles)
+        .distinct()
+        .annotate(nb_produits=models.Count("produits", filter=models.Q(produits__in=produits_visibles)))
+    )
+
+    produits = produits_visibles.order_by("nom")
+    if rayon_slug:
+        produits = produits.filter(rayon__slug=rayon_slug)
     if query:
         produits = produits.filter(nom__icontains=query)
-    return render(request, "catalogue/liste.html", {"produits": produits, "query": query})
+
+    rayon_actif = next((r for r in rayons if r.slug == rayon_slug), None)
+
+    return render(
+        request,
+        "catalogue/liste.html",
+        {
+            "produits": produits,
+            "query": query,
+            "rayons": rayons,
+            "rayon_actif": rayon_actif,
+            "nb_produits_total": produits_visibles.count(),
+        },
+    )
 
 
 def _normaliser_entete(valeur):
