@@ -49,8 +49,8 @@ def marquer_tout_lu(request):
 @require_POST
 def enregistrer_abonnement_push(request):
     """Reçoit l'abonnement Web Push créé côté navigateur (PushManager.subscribe)
-    et le rattache à l'utilisateur connecté, pour lui envoyer des notifications
-    push (voir notifications/push.py)."""
+    et le rattache à l'utilisateur connecté. Réservé au personnel FRPS : les
+    FOSA n'ont pas accès aux notifications push (voir notifications/push.py)."""
     try:
         payload = json.loads(request.body or b"{}")
         endpoint = payload["endpoint"]

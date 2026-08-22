@@ -8,7 +8,9 @@ from .models import Notification
 def notifications_non_lues(request):
     """Expose le nombre de notifications non lues du personnel FRPS connecté,
     pour afficher un badge dans la navbar sur toutes les pages, ainsi que la clé
-    publique VAPID (nécessaire côté navigateur pour s'abonner au push)."""
+    publique VAPID (nécessaire côté navigateur pour s'abonner au push). Réservé
+    au personnel FRPS (stock/comptabilité/admin) : les FOSA n'ont pas accès aux
+    notifications push."""
     user = getattr(request, "user", None)
     if not user or not user.is_authenticated or user.is_formation_sanitaire:
         return {}
