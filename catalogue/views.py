@@ -24,6 +24,7 @@ def liste(request):
         Rayon.objects.filter(produits__in=produits_visibles)
         .distinct()
         .annotate(nb_produits=models.Count("produits", filter=models.Q(produits__in=produits_visibles)))
+        .order_by("nom")
     )
 
     produits = produits_visibles.order_by("nom")
