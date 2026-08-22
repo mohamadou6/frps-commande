@@ -51,10 +51,18 @@
         }
         .app-navbar .nav-link {
             position: relative;
+            display: inline-flex;
+            align-items: center;
+            gap: .35rem;
+            white-space: nowrap;
             color: rgba(255, 255, 255, 0.92) !important;
             padding: .4rem .8rem !important;
             border-radius: 999px;
             transition: background-color .18s ease, color .18s ease, transform .18s ease;
+        }
+        .app-navbar .dropdown {
+            display: flex;
+            align-items: center;
         }
         .app-navbar .nav-link:hover,
         .app-navbar .nav-link:focus {
