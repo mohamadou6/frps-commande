@@ -7,6 +7,7 @@ app_name = "commandes"
 urlpatterns = [
     path("", views.panier, name="panier"),
     path("ajouter/<int:produit_id>/", views.ajouter, name="ajouter"),
+    path("modifier-quantite/<int:produit_id>/", views.modifier_quantite, name="modifier_quantite"),
     path("retirer/<int:produit_id>/", views.retirer, name="retirer"),
     path("confirmer/", views.confirmer, name="confirmer"),
     path("historique/", views.historique, name="historique"),

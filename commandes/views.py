@@ -33,6 +33,37 @@ def ajouter(request, produit_id):
 
 @formation_sanitaire_only_required
 @require_POST
+def modifier_quantite(request, produit_id):
+    """Corrige la quantité d'une ligne directement depuis le panier : il fallait
+    jusqu'ici retirer la ligne puis la rajouter depuis le catalogue."""
+    produit = get_object_or_404(Produit, pk=produit_id)
+    commande = services.get_panier(request.user.formation_sanitaire)
+
+    try:
+        quantite = int(request.POST.get("quantite", ""))
+    except ValueError:
+        messages.error(request, "Quantité invalide.")
+        return redirect("commandes:panier")
+
+    # Descendre à zéro équivaut à retirer la ligne, plutôt que de renvoyer une
+    # erreur « la quantité doit être positive » que la FOSA ne saurait pas corriger.
+    if quantite <= 0:
+        services.retirer_produit(commande, produit)
+        messages.success(request, f"{produit.nom} retiré du panier.")
+        return redirect("commandes:panier")
+
+    try:
+        # ajouter_produit remplace la quantité de la ligne existante (il ne
+        # l'incrémente pas) : c'est exactement l'opération voulue ici.
+        services.ajouter_produit(commande, produit, quantite)
+        messages.success(request, f"Quantité mise à jour : {produit.nom} × {quantite}.")
+    except (services.StockInsuffisantError, ValueError) as exc:
+        messages.error(request, str(exc))
+    return redirect("commandes:panier")
+
+
+@formation_sanitaire_only_required
+@require_POST
 def retirer(request, produit_id):
     produit = get_object_or_404(Produit, pk=produit_id)
     commande = services.get_panier(request.user.formation_sanitaire)

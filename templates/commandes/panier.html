@@ -1,6 +1,24 @@
 {% extends "base.html" %}
 {% block title %}Panier - Commande FRPS{% endblock %}
 {% block content %}
+<style>
+    .quantite-panier {
+        width: 78px;
+        border-radius: 999px;
+        text-align: center;
+        font-weight: 600;
+        border-color: #cfe0d6;
+    }
+    .quantite-panier:focus {
+        border-color: #17a768;
+        box-shadow: 0 0 0 .2rem rgba(23, 167, 104, .18);
+    }
+    /* Téléphone : cibles tactiles confortables, le tableau défile déjà
+       horizontalement dans .table-responsive. */
+    @media (max-width: 767px) {
+        .quantite-panier { height: 40px; }
+    }
+</style>
 <h1 class="h4 app-titre mb-3">Mon panier</h1>
 <div class="table-responsive">
 <table class="table table-striped align-middle">
@@ -17,7 +35,16 @@
         {% for ligne in commande.lignes.all %}
         <tr>
             <td>{{ ligne.produit.nom }}</td>
-            <td>{{ ligne.quantite }}</td>
+            <td>
+                <form method="post" action="{% url 'commandes:modifier_quantite' ligne.produit.id %}"
+                      class="d-flex gap-1 align-items-center">
+                    {% csrf_token %}
+                    <input type="number" name="quantite" min="0" max="{{ ligne.produit.stock_disponible }}"
+                           value="{{ ligne.quantite }}" class="form-control form-control-sm quantite-panier"
+                           aria-label="Quantité pour {{ ligne.produit.nom }}">
+                    <button type="submit" class="btn btn-sm btn-outline-primary text-nowrap">Mettre à jour</button>
+                </form>
+            </td>
             <td>{{ ligne.prix_unitaire_snapshot }} FCFA</td>
             <td>{{ ligne.sous_total|floatformat:"0" }} FCFA</td>
             <td>
