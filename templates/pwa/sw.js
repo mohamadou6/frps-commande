@@ -88,20 +88,35 @@ function urlBase64ToUint8Array(base64) {
     return tableau;
 }
 
+// Le jeton CSRF figé au rendu de ce fichier devient invalide dès que Django le
+// fait tourner (à chaque connexion), or le service worker n'est re-téléchargé
+// que rarement : on lit donc le cookie au moment de l'envoi, et on ne retombe
+// sur la valeur figée que si le navigateur n'expose pas cookieStore.
+async function jetonCsrf() {
+    try {
+        const cookie = await self.cookieStore.get("csrftoken");
+        if (cookie && cookie.value) return cookie.value;
+    } catch (e) { /* cookieStore indisponible */ }
+    return CSRF_TOKEN;
+}
+
 self.addEventListener("pushsubscriptionchange", (event) => {
     if (!VAPID_PUBLIC_KEY) return;
     event.waitUntil(
-        self.registration.pushManager
-            .subscribe({userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)})
-            .then((abonnement) =>
-                fetch(URL_ABONNEMENT_PUSH, {
+        (async () => {
+            try {
+                const abonnement = await self.registration.pushManager.subscribe({
+                    userVisibleOnly: true,
+                    applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+                });
+                await fetch(URL_ABONNEMENT_PUSH, {
                     method: "POST",
                     credentials: "same-origin",
-                    headers: {"Content-Type": "application/json", "X-CSRFToken": CSRF_TOKEN},
+                    headers: {"Content-Type": "application/json", "X-CSRFToken": await jetonCsrf()},
                     body: JSON.stringify(abonnement),
-                })
-            )
-            .catch(() => { /* pas de session active : reessai a la prochaine ouverture de page */ })
+                });
+            } catch (e) { /* pas de session active : reessai a la prochaine ouverture de page */ }
+        })()
     );
 });
 
