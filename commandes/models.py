@@ -40,6 +40,10 @@ class Commande(models.Model):
         return paiement.montant_paye if paiement else Decimal("0")
 
     @property
+    def solde_restant(self):
+        return self.montant_total - self.montant_paye
+
+    @property
     def etat_paiement(self):
         paiement = getattr(self, "paiement", None)
         if paiement is None:

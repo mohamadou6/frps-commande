@@ -22,7 +22,7 @@ from accounts.decorators import (
 from commandes.models import Commande, StatutCommande
 
 from . import services
-from .models import Paiement
+from .models import MethodePaiement, Paiement
 
 
 @formation_sanitaire_only_required
@@ -123,9 +123,18 @@ def modifier_paiement(request, commande_id):
     commande = get_object_or_404(Commande, pk=commande_id)
     if request.method == "POST":
         try:
-            montant_paye = services.mettre_a_jour_paiement(commande, request.POST.get("montant_paye"), request.user)
-            messages.success(request, f"État de paiement mis à jour : {montant_paye} FCFA reçus.")
+            montant_verse = services.mettre_a_jour_paiement(
+                commande,
+                request.POST.get("montant_paye"),
+                request.user,
+                methode=request.POST.get("methode", MethodePaiement.ESPECES),
+            )
+            messages.success(request, f"Versement enregistré : {montant_verse} FCFA reçus.")
             return redirect("paiements:gerer_paiements")
         except ValueError as exc:
             messages.error(request, str(exc))
-    return render(request, "paiements/modifier.html", {"commande": commande})
+    return render(
+        request,
+        "paiements/modifier.html",
+        {"commande": commande, "methodes_paiement": MethodePaiement.choices},
+    )

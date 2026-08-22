@@ -4,7 +4,7 @@
 <h1 class="h4 mb-3">Paiement de la commande #{{ commande.id }}</h1>
 <p>{{ commande.formation_sanitaire.nom }} — {{ commande.date_confirmation|date:"d/m/Y H:i" }}</p>
 
-<div class="row row-cols-1 row-cols-sm-3 g-3 mb-4">
+<div class="row row-cols-1 row-cols-sm-2 row-cols-lg-4 g-3 mb-4">
     <div class="col">
         <div class="border rounded-3 p-3 text-center">
             <div class="text-muted small">Montant total</div>
@@ -19,23 +19,62 @@
     </div>
     <div class="col">
         <div class="border rounded-3 p-3 text-center">
+            <div class="text-muted small">Solde restant</div>
+            <div class="fs-3 fw-bold text-danger">{{ commande.solde_restant }} FCFA</div>
+        </div>
+    </div>
+    <div class="col">
+        <div class="border rounded-3 p-3 text-center">
             <div class="text-muted small">État</div>
             <div class="fs-5 fw-bold">{{ commande.etat_paiement.label }}</div>
         </div>
     </div>
 </div>
 
+{% if commande.etat_paiement != "payee" %}
 <form method="post" class="row g-2 align-items-end">
     {% csrf_token %}
     <div class="col-12 col-md-4">
-        <label class="form-label">Montant reçu (FCFA)</label>
-        <input type="number" step="0.01" min="0" max="{{ commande.montant_total }}" name="montant_paye"
-               value="{{ commande.montant_paye }}" class="form-control" required>
+        <label class="form-label">Nouveau versement reçu (FCFA)</label>
+        <input type="number" step="0.01" min="0.01" max="{{ commande.solde_restant }}" name="montant_paye"
+               placeholder="Montant de ce règlement" class="form-control" required>
     </div>
     <div class="col-12 col-md-3">
-        <button type="submit" class="btn btn-primary w-100">Enregistrer</button>
+        <label class="form-label">Moyen de paiement</label>
+        <select name="methode" class="form-select" required>
+            {% for valeur, libelle in methodes_paiement %}
+            <option value="{{ valeur }}" {% if valeur == "especes" %}selected{% endif %}>{{ libelle }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="col-12 col-md-3">
+        <button type="submit" class="btn btn-primary w-100">Enregistrer le versement</button>
     </div>
 </form>
+{% else %}
+<p class="text-success fw-semibold">Commande payée intégralement.</p>
+{% endif %}
+
+<h2 class="h6 mt-4">Historique des règlements</h2>
+{% if paiement.reglements.all %}
+<div class="table-responsive mb-4">
+<table class="table table-sm table-striped">
+    <thead><tr><th>Date</th><th>Montant versé</th><th>Moyen de paiement</th><th>Saisi par</th></tr></thead>
+    <tbody>
+        {% for reglement in paiement.reglements.all %}
+        <tr>
+            <td>{{ reglement.date_reglement|date:"d/m/Y H:i" }}</td>
+            <td>{{ reglement.montant }} FCFA</td>
+            <td>{{ reglement.get_methode_display }}</td>
+            <td>{{ reglement.saisi_par|default:"-" }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+</div>
+{% else %}
+<p class="text-muted">Aucun versement enregistré pour le moment.</p>
+{% endif %}
 
 <h2 class="h6 mt-4">Détail de la commande</h2>
 <div class="table-responsive">

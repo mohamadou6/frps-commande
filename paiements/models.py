@@ -12,6 +12,7 @@ class StatutPaiement(models.TextChoices):
 
 class MethodePaiement(models.TextChoices):
     ORANGE_MONEY = "orange_money", "Orange Money"
+    MTN_MOMO = "mtn_momo", "MTN Mobile Money"
     ESPECES = "especes", "Espèces (cash)"
 
 
@@ -56,3 +57,25 @@ class Paiement(models.Model):
         if self.montant_paye < self.commande.montant_total:
             return EtatPaiement.PARTIELLE
         return EtatPaiement.PAYEE
+
+
+class ReglementPaiement(models.Model):
+    """Un versement individuel (espèces) reçu pour une commande, saisi par le
+    personnel comptabilité. Paiement.montant_paye reste le cumul de ces
+    versements — cette table est l'historique qui permet de le justifier."""
+
+    paiement = models.ForeignKey(Paiement, on_delete=models.CASCADE, related_name="reglements")
+    montant = models.DecimalField(max_digits=14, decimal_places=2)
+    methode = models.CharField(max_length=32, choices=MethodePaiement.choices, default=MethodePaiement.ESPECES)
+    date_reglement = models.DateTimeField(auto_now_add=True)
+    saisi_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+
+    class Meta:
+        verbose_name = "Règlement"
+        verbose_name_plural = "Règlements"
+        ordering = ["date_reglement"]
+
+    def __str__(self):
+        return f"{self.montant} FCFA - commande #{self.paiement.commande_id} ({self.date_reglement:%d/%m/%Y})"
