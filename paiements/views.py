@@ -136,5 +136,9 @@ def modifier_paiement(request, commande_id):
     return render(
         request,
         "paiements/modifier.html",
-        {"commande": commande, "methodes_paiement": MethodePaiement.choices},
+        {
+            "commande": commande,
+            "paiement": getattr(commande, "paiement", None),
+            "methodes_paiement": MethodePaiement.choices,
+        },
     )
