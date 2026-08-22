@@ -11,22 +11,74 @@
     @media (max-width: 767px) {
         .catalogue-layout { grid-template-columns: 1fr; }
     }
+    /* Barre de recherche : loupe intégrée, champ arrondi, pleine largeur sur
+       téléphone où l'écran ne permet pas de mettre le bouton à côté. */
+    .recherche-barre {
+        display: flex;
+        gap: .5rem;
+        flex-wrap: wrap;
+        align-items: center;
+    }
+    .recherche-champ {
+        position: relative;
+        flex: 1 1 260px;
+        max-width: 440px;
+    }
+    .recherche-champ .form-control {
+        padding-left: 2.4rem;
+        border-radius: 999px;
+        border-color: #d8e7de;
+        height: 44px; /* cible tactile confortable */
+    }
+    .recherche-champ .form-control:focus {
+        border-color: #17a768;
+        box-shadow: 0 0 0 .2rem rgba(23, 167, 104, .16);
+    }
+    .recherche-icone {
+        position: absolute;
+        left: .85rem;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: .95rem;
+        pointer-events: none;
+        opacity: .65;
+    }
+    .recherche-barre .btn { border-radius: 999px; height: 44px; padding-inline: 1.1rem; }
+    @media (max-width: 575px) {
+        .recherche-champ { flex-basis: 100%; max-width: none; }
+        .recherche-barre .btn { flex: 1; }
+    }
+
     .rayons-panel {
         background: #fff;
-        border: 1px solid #eef2ef;
-        border-radius: 14px;
+        border: 1px solid #e6efe9;
+        border-radius: 16px;
         padding: .75rem;
         position: sticky;
         top: .75rem;
+        box-shadow: 0 6px 18px -14px rgba(6, 60, 35, .45);
     }
+    /* Téléphone : les rayons deviennent une rangée de pastilles qui défile
+       horizontalement, au lieu d'une colonne qui repousserait les produits
+       très bas dans la page. */
     @media (max-width: 767px) {
         .rayons-panel {
             position: static;
             display: flex;
             overflow-x: auto;
             gap: .5rem;
-            padding: .6rem;
+            padding: .55rem;
+            scroll-snap-type: x proximity;
+            -webkit-overflow-scrolling: touch;
         }
+        .rayons-panel::-webkit-scrollbar { height: 4px; }
+        .rayons-panel::-webkit-scrollbar-thumb { background: #cfe0d6; border-radius: 999px; }
+        .rayon-lien {
+            scroll-snap-align: start;
+            border: 1px solid #e0ece5;
+            background: #f7fbf8;
+        }
+        .rayon-lien.active { border-color: #0f9d58; }
     }
     .rayons-panel .rayon-titre {
         font-size: .75rem;
@@ -64,20 +116,26 @@
     @media (max-width: 767px) { .rayon-lien .rayon-count { display: none; } }
 
     .produit-card {
-        border: 1px solid #eef2ef;
-        border-radius: 14px;
+        border: 1px solid #e6efe9;
+        border-radius: 16px;
         padding: 1rem;
         height: 100%;
         display: flex;
         flex-direction: column;
         gap: .4rem;
         background: #fff;
+        box-shadow: 0 6px 18px -14px rgba(6, 60, 35, .45);
         transition: box-shadow .15s ease, border-color .15s ease, transform .15s ease;
     }
     .produit-card:hover {
-        box-shadow: 0 10px 24px -14px rgba(15, 157, 88, 0.4);
+        box-shadow: 0 14px 28px -16px rgba(15, 157, 88, 0.55);
         border-color: #cdeadb;
         transform: translateY(-2px);
+    }
+    /* Pas d'effet de survol au doigt : sur téléphone il reste « collé » après
+       le tap et donne l'impression que la carte est sélectionnée. */
+    @media (hover: none) {
+        .produit-card:hover { transform: none; }
     }
     .produit-card .produit-rayon-tag {
         font-size: .72rem;
@@ -134,6 +192,11 @@
         border-color: #a8b6c4;
         box-shadow: none;
     }
+    /* Téléphone : hauteur de cible tactile confortable (44 px recommandés). */
+    @media (max-width: 767px) {
+        .btn-ajouter, .produit-card .quantite-input { height: 44px; }
+        .produit-card { padding: .9rem; }
+    }
     /* Champ quantité assorti : même hauteur, mêmes angles arrondis. */
     .produit-card .quantite-input {
         border-radius: 999px;
@@ -162,20 +225,27 @@
     }
 </style>
 
-<h1 class="h4 mb-3">Catalogue (stock synchronisé FRPS)</h1>
+<div class="mb-3">
+    <h1 class="h4 app-titre mb-1">
+        {% if rayon_actif %}{{ rayon_actif.icone }} {{ rayon_actif.nom }}{% else %}Catalogue des produits{% endif %}
+    </h1>
+    <p class="app-sous-titre mb-0">
+        {{ produits|length }} produit{{ produits|length|pluralize }} disponible{{ produits|length|pluralize }}
+        {% if query %} pour « {{ query }} »{% endif %} — stock et prix tenus à jour par le FRPS.
+    </p>
+</div>
 
-<form method="get" class="row g-2 mb-3">
+<form method="get" class="recherche-barre mb-3">
     {% if rayon_actif %}<input type="hidden" name="rayon" value="{{ rayon_actif.slug }}">{% endif %}
-    <div class="col-auto flex-grow-1">
+    <div class="recherche-champ">
+        <span class="recherche-icone" aria-hidden="true">🔍</span>
         <input type="search" name="q" value="{{ query }}" placeholder="Rechercher un produit..."
-               class="form-control" style="max-width: 400px;">
+               class="form-control" aria-label="Rechercher un produit">
     </div>
-    <div class="col-auto">
-        <button type="submit" class="btn btn-outline-primary">Rechercher</button>
-        {% if query or rayon_actif %}
-        <a href="{% url 'catalogue:liste' %}" class="btn btn-outline-secondary">Réinitialiser</a>
-        {% endif %}
-    </div>
+    <button type="submit" class="btn btn-outline-primary">Rechercher</button>
+    {% if query or rayon_actif %}
+    <a href="{% url 'catalogue:liste' %}" class="btn btn-outline-secondary">Réinitialiser</a>
+    {% endif %}
 </form>
 
 <div class="catalogue-layout">

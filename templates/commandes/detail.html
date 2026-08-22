@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Commande #{{ commande.id }} - Commande FRPS{% endblock %}
 {% block content %}
-<h1 class="h4 mb-3">Commande #{{ commande.id }}</h1>
+<h1 class="h4 app-titre mb-3">Commande #{{ commande.id }}</h1>
 <p>Statut : <span class="badge bg-secondary">{{ commande.get_statut_display }}</span></p>
 {% if commande.statut != "brouillon" %}
 <p>

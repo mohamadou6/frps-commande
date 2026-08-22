@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Gestion des paiements - Commande FRPS{% endblock %}
 {% block content %}
-<h1 class="h4 mb-3">Gestion des paiements</h1>
+<h1 class="h4 app-titre mb-3">Gestion des paiements</h1>
 <p class="text-muted small">
     {% if user.is_admin_frps or user.is_personnel_comptabilite %}
     Saisir le montant reçu pour une commande payée en espèces hors application. Une

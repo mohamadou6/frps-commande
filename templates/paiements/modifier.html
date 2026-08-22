@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Paiement commande #{{ commande.id }} - Commande FRPS{% endblock %}
 {% block content %}
-<h1 class="h4 mb-3">Paiement de la commande #{{ commande.id }}</h1>
+<h1 class="h4 app-titre mb-3">Paiement de la commande #{{ commande.id }}</h1>
 <p>{{ commande.formation_sanitaire.nom }} — {{ commande.date_confirmation|date:"d/m/Y H:i" }}</p>
 
 <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-4 g-3 mb-4">

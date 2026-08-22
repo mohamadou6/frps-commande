@@ -2,7 +2,7 @@
 {% block title %}Notifications - Commande FRPS{% endblock %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
-    <h1 class="h4 mb-0">Notifications</h1>
+    <h1 class="h4 app-titre mb-0">Notifications</h1>
     {% if notifications %}
     <form method="post" action="{% url 'notifications:marquer_tout_lu' %}">
         {% csrf_token %}

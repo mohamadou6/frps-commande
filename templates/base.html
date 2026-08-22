@@ -29,6 +29,87 @@
     {% endcomment %}
     <link href="{% static 'vendor/bootstrap/bootstrap.min.css' %}" rel="stylesheet">
     <style>
+        /* Fond très légèrement teinté plutôt que blanc pur : les cartes et
+           tableaux, eux blancs, s'en détachent au lieu de flotter sans relief.
+           Tout en CSS, aucune image : le réseau des FOSA est lent. */
+        body {
+            background: #f4f8f5;
+            color: #17251d;
+        }
+        .app-carte {
+            background: #fff;
+            border: 1px solid #e6efe9;
+            border-radius: 16px;
+            box-shadow: 0 6px 18px -14px rgba(6, 60, 35, .45);
+        }
+        /* Titres de page : plus d'air et un liseré vert qui rappelle la marque. */
+        .app-titre {
+            font-weight: 700;
+            color: #12321f;
+            display: flex;
+            align-items: center;
+            gap: .6rem;
+        }
+        .app-titre::before {
+            content: "";
+            width: 5px;
+            height: 1.35em;
+            border-radius: 999px;
+            background: linear-gradient(180deg, #17a768, #0b7a45);
+            flex-shrink: 0;
+        }
+        .app-sous-titre {
+            color: #6c8a79;
+            font-size: .92rem;
+            margin-top: -.15rem;
+        }
+        /* Bandeaux d'information plus doux que les alertes Bootstrap par défaut. */
+        .alert {
+            border: 1px solid transparent;
+            border-radius: 14px;
+        }
+        .alert-success { background: #e8f6ee; border-color: #cdeadb; color: #14603c; }
+        .alert-info { background: #e8f2fb; border-color: #cfe2f5; color: #14456e; }
+        /* Tableaux : en-tête discret et lignes lisibles sans rayures marquées. */
+        .table > thead th {
+            background: #f0f6f2;
+            color: #12321f;
+            border-bottom: 1px solid #dbe9e0;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+        /* Les tableaux (panier, commandes, paiements) sont posés dans une boîte
+           blanche : styler le conteneur générique évite de reprendre chaque
+           gabarit un par un. On garde le défilement horizontal de Bootstrap,
+           indispensable sur téléphone. */
+        .table-responsive {
+            background: #fff;
+            border: 1px solid #e6efe9;
+            border-radius: 16px;
+            box-shadow: 0 6px 18px -14px rgba(6, 60, 35, .45);
+            padding: .5rem .5rem 0;
+        }
+        .table-responsive > .table { margin-bottom: .5rem; }
+        /* Encarts de chiffres (tableau de bord, écran de paiement) et cartes-liens,
+           alignés sur l'aspect des cartes du catalogue. */
+        .border.rounded-3 {
+            background: #fff;
+            border-color: #e6efe9 !important;
+            border-radius: 16px !important;
+            box-shadow: 0 6px 18px -14px rgba(6, 60, 35, .45);
+        }
+        .card {
+            border-color: #e6efe9;
+            border-radius: 16px;
+            box-shadow: 0 6px 18px -14px rgba(6, 60, 35, .45);
+            transition: transform .15s ease, box-shadow .15s ease;
+        }
+        a.card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 14px 28px -16px rgba(15, 157, 88, .5);
+            border-color: #cdeadb;
+        }
+        @media (hover: none) { a.card:hover { transform: none; } }
         @media (max-width: 991.98px) {
             .app-navbar .navbar-collapse {
                 margin-top: .75rem;
