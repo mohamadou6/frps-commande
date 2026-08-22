@@ -10,6 +10,7 @@ fichiers statiques, pour deux raisons :
 
 import os
 
+from django.conf import settings
 from django.http import Http404, JsonResponse
 from django.shortcuts import render
 from django.views.decorators.cache import cache_control
@@ -26,8 +27,14 @@ EMPREINTE_SHA256_ANDROID = os.environ.get("ANDROID_SHA256_FINGERPRINT", "")
 @require_GET
 @cache_control(no_cache=True, max_age=0)
 def service_worker(request):
-    """`no-cache` : le navigateur doit revalider le fichier pour voir les mises à jour."""
-    return render(request, "pwa/sw.js", content_type="application/javascript")
+    """`no-cache` : le navigateur doit revalider le fichier pour voir les mises à jour.
+    vapid_public_key passé explicitement (clé publique, sans risque à exposer) pour que
+    le renouvellement d'abonnement push (pushsubscriptionchange) fonctionne même quand
+    la requête n'a pas de session utilisateur avec le bon rôle (le contexte processor
+    notifications_non_lues ne l'expose sinon qu'au personnel FRPS connecté)."""
+    return render(
+        request, "pwa/sw.js", {"vapid_public_key": settings.VAPID_PUBLIC_KEY}, content_type="application/javascript"
+    )
 
 
 @require_GET

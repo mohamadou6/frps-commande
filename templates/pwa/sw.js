@@ -3,11 +3,14 @@
 // URL hachées réelles, et ce fichier change dès qu'un fichier statique change —
 // ce qui suffit au navigateur pour détecter une mise à jour.
 
-const VERSION = "v2";
+const VERSION = "v3";
 const CACHE_COQUILLE = "frps-coquille-" + VERSION; // ressources fixes de l'app
 const CACHE_PAGES = "frps-pages-" + VERSION; // pages HTML déjà consultées
 const PAGE_HORS_LIGNE = "{% url 'hors_ligne' %}";
 const PREFIXE_STATIC = "{% get_static_prefix %}";
+const VAPID_PUBLIC_KEY = "{{ vapid_public_key }}";
+const URL_ABONNEMENT_PUSH = "{% url 'notifications:abonnement_push' %}";
+const CSRF_TOKEN = "{{ csrf_token }}";
 
 // Réseau lent : au-delà de ce délai on sert la version en cache plutôt que de
 // laisser la FOSA devant une page blanche.
@@ -69,6 +72,37 @@ self.addEventListener("message", (event) => {
     if (event.data === "purge-pages") {
         event.waitUntil(caches.delete(CACHE_PAGES));
     }
+});
+
+// Le navigateur peut faire tourner le jeton d'abonnement push à tout moment
+// (fréquent sur mobile), sans qu'aucune page ne soit ouverte pour le détecter
+// via un rechargement classique : cet évènement est le seul moyen fiable de
+// s'en réabonner et de renvoyer le nouvel abonnement au serveur automatiquement,
+// desktop et mobile inclus.
+function urlBase64ToUint8Array(base64) {
+    const padding = "=".repeat((4 - (base64.length % 4)) % 4);
+    const base64Safe = (base64 + padding).replace(/-/g, "+").replace(/_/g, "/");
+    const brut = atob(base64Safe);
+    const tableau = new Uint8Array(brut.length);
+    for (let i = 0; i < brut.length; i++) tableau[i] = brut.charCodeAt(i);
+    return tableau;
+}
+
+self.addEventListener("pushsubscriptionchange", (event) => {
+    if (!VAPID_PUBLIC_KEY) return;
+    event.waitUntil(
+        self.registration.pushManager
+            .subscribe({userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)})
+            .then((abonnement) =>
+                fetch(URL_ABONNEMENT_PUSH, {
+                    method: "POST",
+                    credentials: "same-origin",
+                    headers: {"Content-Type": "application/json", "X-CSRFToken": CSRF_TOKEN},
+                    body: JSON.stringify(abonnement),
+                })
+            )
+            .catch(() => { /* pas de session active : reessai a la prochaine ouverture de page */ })
+    );
 });
 
 // Notification push (voir notifications/push.py) : s'affiche même app/onglet
