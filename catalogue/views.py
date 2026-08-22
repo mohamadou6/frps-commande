@@ -7,6 +7,7 @@ from django.shortcuts import render
 from openpyxl import load_workbook
 
 from accounts.decorators import admin_frps_required, formation_sanitaire_required
+from commandes.models import Commande, StatutCommande
 
 from .models import Magasin, Produit, Rayon
 
@@ -34,6 +35,23 @@ def liste(request):
         produits = produits.filter(nom__icontains=query)
 
     rayon_actif = next((r for r in rayons if r.slug == rayon_slug), None)
+
+    # Quantités déjà au panier, pour les signaler sur les cartes : sans ce repère,
+    # sur une centaine de produits, la même ligne était facilement ajoutée deux fois.
+    # On lit le brouillon existant sans passer par get_panier(), qui en créerait un
+    # à chaque visite du catalogue. L'admin FRPS peut consulter le catalogue mais
+    # n'a pas de formation sanitaire, donc pas de panier.
+    quantites_panier = {}
+    if request.user.is_formation_sanitaire:
+        panier = Commande.objects.filter(
+            formation_sanitaire=request.user.formation_sanitaire, statut=StatutCommande.BROUILLON
+        ).first()
+        if panier:
+            quantites_panier = dict(panier.lignes.values_list("produit_id", "quantite"))
+
+    produits = list(produits)
+    for produit in produits:
+        produit.quantite_panier = quantites_panier.get(produit.pk, 0)
 
     return render(
         request,

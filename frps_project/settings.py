@@ -74,6 +74,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'notifications.context_processors.notifications_non_lues',
+                'commandes.context_processors.panier_resume',
             ],
         },
     },

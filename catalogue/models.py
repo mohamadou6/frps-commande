@@ -1,6 +1,13 @@
 from django.db import models
 
 
+# Seuils d'alerte affichés sur les cartes du catalogue. Volontairement arbitraires
+# (le stock va de quelques unités à plus d'un million selon les produits) : à ajuster
+# si le terrain montre qu'ils déclenchent trop tôt ou trop tard.
+SEUIL_STOCK_CRITIQUE = 10
+SEUIL_STOCK_FAIBLE = 50
+
+
 class Magasin(models.TextChoices):
     PRINCIPAL = "principal", "Magasin principal"
     UCPC = "ucpc", "Magasin UCPC"
@@ -61,3 +68,16 @@ class Produit(models.Model):
     @property
     def en_stock(self):
         return self.actif and self.stock_disponible > 0
+
+    @property
+    def niveau_stock(self):
+        """« critique » / « faible » / « normal » : sans cette distinction, un produit
+        à 2 unités s'affichait avec le même badge vert qu'un produit à 160 000, et la
+        FOSA ne voyait pas qu'elle commandait sur un stock presque épuisé."""
+        if self.stock_disponible <= 0:
+            return "rupture"
+        if self.stock_disponible < SEUIL_STOCK_CRITIQUE:
+            return "critique"
+        if self.stock_disponible < SEUIL_STOCK_FAIBLE:
+            return "faible"
+        return "normal"

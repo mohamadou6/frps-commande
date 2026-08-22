@@ -41,6 +41,28 @@
                 width: fit-content;
             }
         }
+        /* Bootstrap rend btn-primary en bleu vif, qui jurait avec le vert de la
+           marque sur les boutons les plus vus (« Ajouter », « Afficher »).
+           On redéfinit ici plutôt que de remplacer btn-primary par btn-success
+           dans chaque gabarit : une seule source pour toute l'application. */
+        .btn-primary {
+            --bs-btn-bg: #0f9d58;
+            --bs-btn-border-color: #0f9d58;
+            --bs-btn-hover-bg: #0b7a45;
+            --bs-btn-hover-border-color: #0b7a45;
+            --bs-btn-active-bg: #0b7a45;
+            --bs-btn-active-border-color: #0b7a45;
+            --bs-btn-disabled-bg: #86bfa2;
+            --bs-btn-disabled-border-color: #86bfa2;
+        }
+        .btn-outline-primary {
+            --bs-btn-color: #0b7a45;
+            --bs-btn-border-color: #0f9d58;
+            --bs-btn-hover-bg: #0f9d58;
+            --bs-btn-hover-border-color: #0f9d58;
+            --bs-btn-active-bg: #0b7a45;
+            --bs-btn-active-border-color: #0b7a45;
+        }
         .app-navbar {
             background: linear-gradient(90deg, #0b7a45 0%, #12925a 55%, #17a768 100%);
             box-shadow: 0 4px 14px -6px rgba(6, 60, 35, 0.45);
@@ -135,7 +157,10 @@
                 <a class="nav-link" href="{% url 'catalogue:liste' %}">📦 Catalogue</a>
                 {% endif %}
                 {% if user.is_formation_sanitaire %}
-                <a class="nav-link" href="{% url 'commandes:panier' %}">🛒 Panier</a>
+                <a class="nav-link" href="{% url 'commandes:panier' %}">
+                    🛒 Panier
+                    {% if panier_nb_lignes %}<span class="badge bg-danger">{{ panier_nb_lignes }}</span>{% endif %}
+                </a>
                 <a class="nav-link" href="{% url 'commandes:historique' %}">🧾 Mes commandes</a>
                 {% endif %}
                 {% if not user.is_formation_sanitaire %}
