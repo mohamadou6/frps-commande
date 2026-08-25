@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load l10n %}
 {% block title %}Paiement commande #{{ commande.id }} - Commande FRPS{% endblock %}
 {% block content %}
 <h1 class="h4 app-titre mb-3">Paiement de la commande #{{ commande.id }}</h1>
@@ -36,7 +37,7 @@
     {% csrf_token %}
     <div class="col-12 col-md-4">
         <label class="form-label">Nouveau versement reçu (FCFA)</label>
-        <input type="number" step="0.01" min="0.01" max="{{ commande.solde_restant }}" name="montant_paye"
+        <input type="number" step="0.01" min="0.01" max="{{ commande.solde_restant|unlocalize }}" name="montant_paye"
                placeholder="Montant de ce règlement" class="form-control" required>
     </div>
     <div class="col-12 col-md-3">

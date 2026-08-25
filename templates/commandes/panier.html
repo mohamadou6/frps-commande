@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load l10n %}
 {% block title %}Panier - Commande FRPS{% endblock %}
 {% block content %}
 <style>
@@ -39,8 +40,8 @@
                 <form method="post" action="{% url 'commandes:modifier_quantite' ligne.produit.id %}"
                       class="d-flex gap-1 align-items-center">
                     {% csrf_token %}
-                    <input type="number" name="quantite" min="0" max="{{ ligne.produit.stock_disponible }}"
-                           value="{{ ligne.quantite }}" class="form-control form-control-sm quantite-panier"
+                    <input type="number" name="quantite" min="0" max="{{ ligne.produit.stock_disponible|unlocalize }}"
+                           value="{{ ligne.quantite|unlocalize }}" class="form-control form-control-sm quantite-panier"
                            aria-label="Quantité pour {{ ligne.produit.nom }}">
                     <button type="submit" class="btn btn-sm btn-outline-primary text-nowrap">Mettre à jour</button>
                 </form>
