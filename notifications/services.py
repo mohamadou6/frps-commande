@@ -99,9 +99,16 @@ def notifier_nouvelle_commande(commande):
 
     from .push import envoyer_push_aux_utilisateurs
 
-    # L'admin FRPS supervise tout : il reçoit aussi les SMS/push destinés au personnel_stock.
-    destinataires = User.objects.filter(Q(role=Role.PERSONNEL_STOCK) | Q(role=Role.ADMIN), is_active=True)
-    numeros = destinataires.exclude(telephone="").values_list("telephone", flat=True)
+    # SMS : reste ciblé sur le personnel concerné par ce type d'évènement (le stock
+    # édite la facture sur Sage), pour ne pas envoyer un SMS hors-sujet à la
+    # comptabilité. L'admin FRPS supervise tout : il reçoit aussi les SMS du personnel_stock.
+    destinataires_sms = User.objects.filter(Q(role=Role.PERSONNEL_STOCK) | Q(role=Role.ADMIN), is_active=True)
+    numeros = destinataires_sms.exclude(telephone="").values_list("telephone", flat=True)
+
+    # Push : tout le personnel FRPS (stock, comptabilité, admin), à l'exclusion des
+    # FOSA — demandé explicitement, la notification push n'est pas réservée au rôle
+    # directement concerné comme le SMS.
+    destinataires_push = User.objects.exclude(role=Role.FORMATION_SANITAIRE).filter(is_active=True)
 
     message = _construire_message(f"Cde #{commande.pk}", commande, "Editer la Facture sur Sage.")
     _envoyer_a_destinataires(numeros, message, TypeEvenement.NOUVELLE_COMMANDE, commande=commande)
@@ -116,7 +123,7 @@ def notifier_nouvelle_commande(commande):
         ),
     )
     envoyer_push_aux_utilisateurs(
-        destinataires,
+        destinataires_push,
         f"Nouvelle commande #{commande.pk}",
         f"{commande.formation_sanitaire.nom} - {formater_montant(commande.montant_total)} FCFA",
         url="/notifications/",
@@ -132,9 +139,12 @@ def notifier_paiement_confirme(commande):
 
     from .push import envoyer_push_aux_utilisateurs
 
-    # L'admin FRPS supervise tout : il reçoit aussi les SMS/push destinés au personnel_comptabilite.
-    destinataires = User.objects.filter(Q(role=Role.PERSONNEL_COMPTABILITE) | Q(role=Role.ADMIN), is_active=True)
-    numeros = destinataires.exclude(telephone="").values_list("telephone", flat=True)
+    # SMS : ciblé comptabilité (+ admin), comme pour la nouvelle commande.
+    destinataires_sms = User.objects.filter(Q(role=Role.PERSONNEL_COMPTABILITE) | Q(role=Role.ADMIN), is_active=True)
+    numeros = destinataires_sms.exclude(telephone="").values_list("telephone", flat=True)
+
+    # Push : tout le personnel FRPS, à l'exclusion des FOSA (voir notifier_nouvelle_commande).
+    destinataires_push = User.objects.exclude(role=Role.FORMATION_SANITAIRE).filter(is_active=True)
 
     message = _construire_message(f"Paiement recu #{commande.pk}", commande, "Recu SVP.")
     _envoyer_a_destinataires(numeros, message, TypeEvenement.PAIEMENT_CONFIRME, commande=commande)
@@ -149,7 +159,7 @@ def notifier_paiement_confirme(commande):
         ),
     )
     envoyer_push_aux_utilisateurs(
-        destinataires,
+        destinataires_push,
         f"Paiement reçu #{commande.pk}",
         f"{commande.formation_sanitaire.nom} - {formater_montant(commande.montant_total)} FCFA",
         url="/notifications/",
