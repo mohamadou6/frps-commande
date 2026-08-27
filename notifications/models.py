@@ -96,7 +96,20 @@ class PushSubscription(models.Model):
     endpoint = models.URLField(max_length=500, unique=True)
     p256dh = models.CharField(max_length=255)
     auth = models.CharField(max_length=255)
+    appareil_id = models.CharField(
+        max_length=64,
+        blank=True,
+        db_index=True,
+        help_text=(
+            "Identifiant stable du navigateur/appareil (tiré du localStorage). Sert à "
+            "remplacer l'abonnement précédent du même appareil au lieu d'en accumuler un de plus."
+        ),
+    )
     date_creation = models.DateTimeField(auto_now_add=True)
+    date_confirmation = models.DateTimeField(
+        auto_now=True,
+        help_text="Dernier réenregistrement par l'appareil : au-delà de la péremption, l'abonnement est supprimé.",
+    )
 
     class Meta:
         verbose_name = "Abonnement push"

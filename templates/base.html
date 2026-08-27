@@ -453,6 +453,22 @@ if ("serviceWorker" in navigator) {
         return tableau;
     }
 
+    // Identifiant stable de cet appareil : le jeton d'abonnement, lui, tourne
+    // regulierement et ne peut donc pas servir a reconnaitre l'appareil. Sans ce
+    // reperage, chaque rotation laissait en base un abonnement fantome de plus, que
+    // le service de push accepte (201) sans plus rien livrer. Si le localStorage est
+    // indisponible, on renvoie une chaine vide plutot qu'un identifiant jetable qui
+    // creerait justement le doublon qu'on cherche a eviter.
+    function identifiantAppareil() {
+        var existant = memoire("frps-appareil-id");
+        if (existant) return existant;
+        var nouveau = (window.crypto && window.crypto.randomUUID)
+            ? window.crypto.randomUUID()
+            : String(Date.now()) + "-" + Math.random().toString(16).slice(2);
+        memoire("frps-appareil-id", nouveau);
+        return memoire("frps-appareil-id") === nouveau ? nouveau : "";
+    }
+
     function abonner() {
         navigator.serviceWorker.ready.then(function (enregistrement) {
             return enregistrement.pushManager.subscribe({
@@ -460,11 +476,13 @@ if ("serviceWorker" in navigator) {
                 applicationServerKey: urlBase64ToUint8Array("{{ vapid_public_key }}"),
             });
         }).then(function (abonnement) {
+            var corps = abonnement.toJSON();
+            corps.appareil_id = identifiantAppareil();
             return fetch("{% url 'notifications:abonnement_push' %}", {
                 method: "POST",
                 credentials: "same-origin",
                 headers: {"Content-Type": "application/json", "X-CSRFToken": "{{ csrf_token }}"},
-                body: JSON.stringify(abonnement),
+                body: JSON.stringify(corps),
             });
         }).catch(function () { /* refus du navigateur ou hors ligne : reessai a la prochaine page */ });
     }

@@ -38,7 +38,7 @@ class CommandeWorkflowTests(TestCase):
         self.assertEqual(commande.montant_total, Decimal("2000"))
         sms = SMSLog.objects.get(destinataire="+237600000001")
         self.assertIn("Test x2", sms.message)
-        self.assertIn("2000", sms.message)
+        self.assertIn("2 000", sms.message)
 
     def test_confirmer_panier_vide_leve_une_erreur(self):
         commande = services.get_panier(self.formation)

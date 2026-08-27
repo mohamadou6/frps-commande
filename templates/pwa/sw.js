@@ -109,11 +109,20 @@ self.addEventListener("pushsubscriptionchange", (event) => {
                     userVisibleOnly: true,
                     applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
                 });
+                const corps = abonnement.toJSON();
+                // Le serveur ne peut pas deviner quel abonnement ce nouveau jeton
+                // remplace : sans cet ancien endpoint, l'abonnement remplace resterait
+                // en base et continuerait d'etre accepte par le service de push sans
+                // plus rien livrer. Le service worker n'a pas acces au localStorage,
+                // il ne peut donc pas fournir l'appareil_id envoye par les pages.
+                if (event.oldSubscription && event.oldSubscription.endpoint) {
+                    corps.ancien_endpoint = event.oldSubscription.endpoint;
+                }
                 await fetch(URL_ABONNEMENT_PUSH, {
                     method: "POST",
                     credentials: "same-origin",
                     headers: {"Content-Type": "application/json", "X-CSRFToken": await jetonCsrf()},
-                    body: JSON.stringify(abonnement),
+                    body: JSON.stringify(corps),
                 });
             } catch (e) { /* pas de session active : reessai a la prochaine ouverture de page */ }
         })()

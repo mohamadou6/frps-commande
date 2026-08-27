@@ -53,4 +53,71 @@
         </tbody>
     </table>
 </div>
+
+<div class="card mt-4">
+    <div class="card-body">
+        <h2 class="h6 app-titre">Mes appareils recevant les notifications</h2>
+        <p class="small text-muted mb-3">
+            Un appareil n'apparaît ici qu'après avoir autorisé les notifications dessus. Le bouton
+            <em>Tester</em> n'envoie que sur l'appareil de la ligne : c'est le seul moyen de vérifier
+            qu'il reçoit vraiment, le service de push acceptant les envois même vers un abonnement mort.
+        </p>
+        <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0" id="table-appareils">
+                <thead>
+                    <tr>
+                        <th>Appareil</th>
+                        <th>Abonné le</th>
+                        <th>Vu pour la dernière fois</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for abonnement in abonnements_push %}
+                    <tr data-appareil="{{ abonnement.appareil_id }}">
+                        <td class="text-nowrap">
+                            Appareil #{{ abonnement.pk }}
+                            <span class="badge text-bg-success d-none" data-role="badge-appareil-courant">Cet appareil</span>
+                        </td>
+                        <td class="text-nowrap small text-muted">{{ abonnement.date_creation|date:"d/m/Y H:i" }}</td>
+                        <td class="text-nowrap small text-muted">{{ abonnement.date_confirmation|date:"d/m/Y H:i" }}</td>
+                        <td class="text-end text-nowrap">
+                            <form method="post" action="{% url 'notifications:tester_abonnement_push' abonnement.pk %}" class="d-inline mb-0">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-outline-primary">Tester</button>
+                            </form>
+                            <form method="post" action="{% url 'notifications:supprimer_abonnement_push' abonnement.pk %}" class="d-inline mb-0">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-outline-danger">Retirer</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="4" class="text-muted">
+                            Aucun appareil abonné. Autorisez les notifications depuis le bandeau en haut de page.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+// Marque la ligne de l'appareil sur lequel cette page est ouverte : sans ce repère,
+// impossible de savoir laquelle des lignes correspond au téléphone qu'on a en main.
+(function () {
+    var identifiant = null;
+    try { identifiant = window.localStorage.getItem("frps-appareil-id"); } catch (e) { return; }
+    if (!identifiant) return;
+    var lignes = document.querySelectorAll("#table-appareils tr[data-appareil]");
+    for (var i = 0; i < lignes.length; i++) {
+        if (lignes[i].getAttribute("data-appareil") === identifiant) {
+            lignes[i].querySelector("[data-role=badge-appareil-courant]").classList.remove("d-none");
+        }
+    }
+})();
+</script>
 {% endblock %}

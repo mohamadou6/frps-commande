@@ -9,6 +9,12 @@ urlpatterns = [
     path("<int:notification_id>/lu/", views.marquer_lu, name="marquer_lu"),
     path("tout-lu/", views.marquer_tout_lu, name="marquer_tout_lu"),
     path("abonnement-push/", views.enregistrer_abonnement_push, name="abonnement_push"),
+    path("abonnement-push/<int:abonnement_id>/test/", views.tester_abonnement_push, name="tester_abonnement_push"),
+    path(
+        "abonnement-push/<int:abonnement_id>/supprimer/",
+        views.supprimer_abonnement_push,
+        name="supprimer_abonnement_push",
+    ),
     path("orange-dr/", views.orange_dr_callback, name="orange_dr_callback"),
     path("twilio-dlr/", views.twilio_status_callback, name="twilio_status_callback"),
 ]

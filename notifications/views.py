@@ -2,6 +2,7 @@ import json
 import logging
 
 from django.contrib import messages
+from django.db.models import Q
 from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -12,6 +13,7 @@ from accounts.decorators import personnel_frps_required
 from accounts.models import Role
 
 from .models import Notification, PushSubscription, SMSLog
+from .push import envoyer_push_a_abonnement
 
 logger = logging.getLogger("notifications.sms")
 
@@ -25,7 +27,14 @@ def _notifications_du_role(user):
 @personnel_frps_required
 def liste(request):
     notifications = _notifications_du_role(request.user).select_related("commande")
-    return render(request, "notifications/liste.html", {"notifications": notifications})
+    return render(
+        request,
+        "notifications/liste.html",
+        {
+            "notifications": notifications,
+            "abonnements_push": request.user.push_subscriptions.order_by("-date_confirmation"),
+        },
+    )
 
 
 @personnel_frps_required
@@ -50,7 +59,15 @@ def marquer_tout_lu(request):
 def enregistrer_abonnement_push(request):
     """Reçoit l'abonnement Web Push créé côté navigateur (PushManager.subscribe)
     et le rattache à l'utilisateur connecté. Réservé au personnel FRPS : les
-    FOSA n'ont pas accès aux notifications push (voir notifications/push.py)."""
+    FOSA n'ont pas accès aux notifications push (voir notifications/push.py).
+
+    Le navigateur fait tourner le jeton d'abonnement sans prévenir : sans ménage,
+    la base accumulait un abonnement fantôme par rotation, accepté par FCM (201)
+    mais ne livrant plus rien — l'utilisateur ne recevait la notification que sur
+    l'appareil dont le jeton était encore vivant. On supprime donc l'abonnement
+    précédent du même appareil, identifié soit par `ancien_endpoint` (envoyé par
+    le service worker sur `pushsubscriptionchange`), soit par `appareil_id`
+    (identifiant stable stocké dans le localStorage, envoyé par la page)."""
     try:
         payload = json.loads(request.body or b"{}")
         endpoint = payload["endpoint"]
@@ -59,10 +76,60 @@ def enregistrer_abonnement_push(request):
     except (ValueError, KeyError):
         return HttpResponse(status=400)
 
-    PushSubscription.objects.update_or_create(
-        endpoint=endpoint, defaults={"user": request.user, "p256dh": p256dh, "auth": auth}
-    )
+    appareil_id = str(payload.get("appareil_id") or "")[:64]
+    ancien_endpoint = str(payload.get("ancien_endpoint") or "")
+
+    conditions = Q()
+    if appareil_id:
+        conditions |= Q(user=request.user, appareil_id=appareil_id)
+    if ancien_endpoint:
+        conditions |= Q(endpoint=ancien_endpoint)
+    if conditions:
+        perimes, _ = PushSubscription.objects.filter(conditions).exclude(endpoint=endpoint).delete()
+        if perimes:
+            logger.info("Push: %s abonnement(s) perime(s) remplace(s) pour %s", perimes, request.user)
+
+    valeurs = {"user": request.user, "p256dh": p256dh, "auth": auth}
+    if appareil_id:
+        # Jamais d'écrasement par une chaîne vide : le service worker, lui, n'a pas
+        # accès au localStorage et ne peut pas fournir cet identifiant.
+        valeurs["appareil_id"] = appareil_id
+    PushSubscription.objects.update_or_create(endpoint=endpoint, defaults=valeurs)
     return HttpResponse(status=204)
+
+
+@personnel_frps_required
+@require_POST
+def tester_abonnement_push(request, abonnement_id):
+    """Envoie une notification de test à UN appareil de l'utilisateur connecté.
+    Seul moyen de savoir quel appareil reçoit réellement : une acceptation par le
+    service de push ne prouve pas la livraison."""
+    abonnement = get_object_or_404(PushSubscription, pk=abonnement_id, user=request.user)
+    if envoyer_push_a_abonnement(
+        abonnement,
+        "Test de notification",
+        "Si vous lisez ceci, cet appareil reçoit bien les notifications FRPS.",
+        url="/notifications/",
+    ):
+        messages.success(
+            request,
+            "Notification de test envoyée. Si elle n'arrive pas sur cet appareil dans "
+            "la minute, supprimez l'abonnement : il est périmé.",
+        )
+    else:
+        messages.error(request, "L'envoi a échoué : abonnement supprimé ou clés push non configurées.")
+    return redirect("notifications:liste")
+
+
+@personnel_frps_required
+@require_POST
+def supprimer_abonnement_push(request, abonnement_id):
+    abonnement = get_object_or_404(PushSubscription, pk=abonnement_id, user=request.user)
+    abonnement.delete()
+    messages.success(
+        request, "Appareil retiré. Rouvrez l'application sur cet appareil pour le réabonner."
+    )
+    return redirect("notifications:liste")
 
 
 @csrf_exempt
