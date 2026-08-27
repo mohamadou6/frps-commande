@@ -103,3 +103,35 @@ def orange_dr_callback(request):
             logger.warning("Orange DR callback: aucun SMSLog trouve pour resource_id=%s", resource_id)
 
     return HttpResponse(status=200)
+
+
+@csrf_exempt
+@require_POST
+def twilio_status_callback(request):
+    """Reçoit l'accusé de livraison (DLR) envoyé par Twilio après chaque SMS.
+
+    Sans ce callback, SMSLog.statut_livraison restait vide pour Twilio et
+    l'application affichait « envoyé » même quand l'opérateur destinataire ne
+    livrait jamais le message — c'est ainsi qu'une dégradation de route vers le
+    Cameroun est passée inaperçue plusieurs jours en août 2026.
+
+    URL publique, sans authentification Django (Twilio ne fournit pas de session) :
+    à déclarer dans la console Twilio ou, comme ici, passée à chaque envoi via
+    `status_callback`. Toujours répondre 200 pour accuser réception.
+
+    Twilio poste en form-encoded : MessageSid, MessageStatus, ErrorCode.
+    """
+    sid = request.POST.get("MessageSid") or ""
+    statut = request.POST.get("MessageStatus") or ""
+    code_erreur = request.POST.get("ErrorCode") or ""
+
+    logger.info("Twilio DLR: sid=%s statut=%s erreur=%s", sid, statut, code_erreur)
+
+    if sid:
+        maj = SMSLog.objects.filter(reference_externe=sid).update(
+            statut_livraison=statut, date_statut_livraison=timezone.now()
+        )
+        if not maj:
+            logger.warning("Twilio DLR: aucun SMSLog trouve pour sid=%s", sid)
+
+    return HttpResponse(status=200)

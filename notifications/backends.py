@@ -49,7 +49,20 @@ class TwilioSMSBackend(SMSBackend):
             )
 
         client = Client(account_sid, auth_token)
-        sms = client.messages.create(from_=sms_from, to=numero, body=message)
+
+        # Un SID renvoyé ici prouve seulement que Twilio a ACCEPTÉ le message, pas
+        # qu'il a été livré : un SMS peut rester au statut « sent » indéfiniment si
+        # l'opérateur destinataire ne le remet jamais (constaté vers le Cameroun en
+        # août 2026). On demande donc l'accusé de livraison, qui vient renseigner
+        # SMSLog.statut_livraison via views.twilio_status_callback.
+        parametres = {"from_": sms_from, "to": numero, "body": message}
+        base_publique = (settings.PUBLIC_BASE_URL or "").rstrip("/")
+        if base_publique.startswith("https://"):
+            # Twilio exige une URL publique en HTTPS : en local (http://localhost)
+            # on s'en passe plutôt que de faire échouer tout envoi.
+            parametres["status_callback"] = f"{base_publique}/notifications/twilio-dlr/"
+
+        sms = client.messages.create(**parametres)
         if not sms.sid:
             raise RuntimeError("Twilio n'a renvoyé aucun SID pour ce SMS")
         return sms.sid
