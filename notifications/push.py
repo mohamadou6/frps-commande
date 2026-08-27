@@ -49,6 +49,11 @@ def envoyer_push_a_abonnement(abonnement, titre, corps, url="/"):
             vapid_private_key=_vapid(),
             vapid_claims={"sub": settings.VAPID_CLAIMS_EMAIL},
             ttl=_TTL_SECONDES,
+            # Sans cet en-tete, pywebpush envoie une urgence "normal", qu'Android
+            # traite comme un message de priorite normale : l'appareil en veille ne
+            # le recoit qu'a sa prochaine fenetre de maintenance, soit plusieurs
+            # dizaines de minutes de retard sur une commande a traiter.
+            headers={"Urgency": "high"},
         )
         return True
     except WebPushException as exc:
