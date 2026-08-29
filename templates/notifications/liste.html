@@ -69,6 +69,7 @@
                         <th>Appareil</th>
                         <th>Abonné le</th>
                         <th>Vu pour la dernière fois</th>
+                        <th>Dernier envoi</th>
                         <th class="text-end">Actions</th>
                     </tr>
                 </thead>
@@ -81,6 +82,14 @@
                         </td>
                         <td class="text-nowrap small text-muted">{{ abonnement.date_creation|date:"d/m/Y H:i" }}</td>
                         <td class="text-nowrap small text-muted">{{ abonnement.date_confirmation|date:"d/m/Y H:i" }}</td>
+                        <td class="text-nowrap small">
+                            {% if abonnement.date_dernier_envoi %}
+                            <span class="text-muted">{{ abonnement.date_dernier_envoi|date:"d/m H:i" }}</span>
+                            <span class="badge {% if abonnement.dernier_statut == 'envoyé' %}text-bg-secondary{% else %}text-bg-danger{% endif %}">{{ abonnement.dernier_statut }}</span>
+                            {% else %}
+                            <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
                         <td class="text-end text-nowrap">
                             <form method="post" action="{% url 'notifications:tester_abonnement_push' abonnement.pk %}" class="d-inline mb-0">
                                 {% csrf_token %}
@@ -94,7 +103,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="4" class="text-muted">
+                        <td colspan="5" class="text-muted">
                             Aucun appareil abonné. Autorisez les notifications depuis le bandeau en haut de page.
                         </td>
                     </tr>

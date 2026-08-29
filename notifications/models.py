@@ -110,6 +110,15 @@ class PushSubscription(models.Model):
         auto_now=True,
         help_text="Dernier réenregistrement par l'appareil : au-delà de la péremption, l'abonnement est supprimé.",
     )
+    date_dernier_envoi = models.DateTimeField(null=True, blank=True)
+    dernier_statut = models.CharField(
+        max_length=32,
+        blank=True,
+        help_text=(
+            "Réponse du service de push au dernier envoi. « envoyé » signifie accepté, "
+            "pas livré : c'est le test depuis l'appareil qui tranche."
+        ),
+    )
 
     class Meta:
         verbose_name = "Abonnement push"

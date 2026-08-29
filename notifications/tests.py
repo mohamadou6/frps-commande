@@ -1,4 +1,6 @@
 import json
+import threading
+import time
 from datetime import timedelta
 from decimal import Decimal
 from unittest.mock import patch
@@ -230,3 +232,56 @@ class AbonnementPushTests(TestCase):
         reponse = self.client.get(reverse("notifications:liste"))
 
         self.assertEqual([a.endpoint for a in reponse.context["abonnements_push"]], ["https://fcm.example/telephone"])
+
+    def test_le_resultat_du_dernier_envoi_est_trace_sans_rajeunir_labonnement(self):
+        """La trace ne doit pas passer par save() : l'auto_now de date_confirmation
+        ferait passer un abonnement fantome pour vivant et desamorcerait la peremption."""
+        from .push import envoyer_push_a_abonnement
+
+        self._abonner("https://fcm.example/telephone", appareil_id="appareil-A")
+        abonnement = PushSubscription.objects.get()
+        confirmation_avant = abonnement.date_confirmation
+
+        with patch("notifications.push.webpush"), patch("notifications.push._vapid"):
+            envoyer_push_a_abonnement(abonnement, "Titre", "Corps")
+
+        abonnement.refresh_from_db()
+        self.assertEqual(abonnement.dernier_statut, "envoyé")
+        self.assertIsNotNone(abonnement.date_dernier_envoi)
+        self.assertEqual(abonnement.date_confirmation, confirmation_avant)
+
+    def test_un_envoi_qui_naboutit_pas_est_trace_injoignable(self):
+        from .push import envoyer_push_a_abonnement
+
+        self._abonner("https://fcm.example/telephone", appareil_id="appareil-A")
+        abonnement = PushSubscription.objects.get()
+
+        with patch("notifications.push.webpush", side_effect=OSError("delai depasse")), patch(
+            "notifications.push._vapid"
+        ):
+            envoye = envoyer_push_a_abonnement(abonnement, "Titre", "Corps")
+
+        abonnement.refresh_from_db()
+        self.assertFalse(envoye)
+        self.assertEqual(abonnement.dernier_statut, "injoignable")
+
+    def test_lenvoi_groupe_ne_bloque_pas_lappelant(self):
+        """Ces envois partent depuis la confirmation de commande : ils doivent se
+        faire en tache de fond, pas retarder la reponse rendue a la FOSA."""
+        from .push import envoyer_push_aux_utilisateurs
+
+        self._abonner("https://fcm.example/telephone", appareil_id="appareil-A")
+        termine = threading.Event()
+
+        def _envoi_lent(*args, **kwargs):
+            termine.wait(5)
+
+        with patch("notifications.push.webpush", side_effect=_envoi_lent), patch(
+            "notifications.push._vapid"
+        ), patch("notifications.push._tracer"):
+            debut = time.monotonic()
+            envoyer_push_aux_utilisateurs([self.stock], "Titre", "Corps")
+            duree = time.monotonic() - debut
+            termine.set()
+
+        self.assertLess(duree, 1, "l'appelant a attendu la fin de l'envoi push")

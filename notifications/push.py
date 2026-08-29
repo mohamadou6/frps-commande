@@ -1,8 +1,10 @@
 import json
 import logging
+import threading
 from datetime import timedelta
 
 from django.conf import settings
+from django.db import connection
 from django.utils import timezone
 from py_vapid import Vapid01
 from pywebpush import WebPushException, webpush
@@ -22,6 +24,12 @@ _TTL_SECONDES = 7 * 24 * 60 * 60
 # ce delai on les supprime : un appareil bien vivant se reabonne des l'ouverture
 # suivante, un fantome disparait definitivement.
 _PEREMPTION_JOURS = 45
+
+# pywebpush n'impose aucun delai maximum a l'appel reseau : un service de push qui ne
+# repond pas gele l'appel indefiniment. Mesure le 2026-08-29 depuis un reseau lent :
+# 37 s pour un seul appareil. Ces envois partant depuis la requete de confirmation de
+# commande, sans cette borne c'est la FOSA qui attend - puis la requete qui est coupee.
+_DELAI_ENVOI_SECONDES = 10
 
 
 def _vapid():
@@ -54,7 +62,9 @@ def envoyer_push_a_abonnement(abonnement, titre, corps, url="/"):
             # le recoit qu'a sa prochaine fenetre de maintenance, soit plusieurs
             # dizaines de minutes de retard sur une commande a traiter.
             headers={"Urgency": "high"},
+            timeout=_DELAI_ENVOI_SECONDES,
         )
+        _tracer(abonnement, "envoyé")
         return True
     except WebPushException as exc:
         statut = exc.response.status_code if exc.response is not None else None
@@ -62,7 +72,39 @@ def envoyer_push_a_abonnement(abonnement, titre, corps, url="/"):
             abonnement.delete()
         else:
             logger.warning("Echec envoi push a %s: %s", abonnement.user, exc)
+            _tracer(abonnement, f"echec {statut or 'reseau'}")
         return False
+    except Exception as exc:  # noqa: BLE001 - delai depasse, DNS, coupure reseau
+        logger.warning("Echec envoi push a %s: %s", abonnement.user, exc)
+        _tracer(abonnement, "injoignable")
+        return False
+
+
+def _tracer(abonnement, statut):
+    """Garde la trace du dernier envoi, affichée dans « Mes appareils ».
+
+    Écriture par `update()` : un `save()` déclencherait l'`auto_now` de
+    `date_confirmation` et ferait passer un abonnement fantôme pour vivant, ce qui
+    désamorcerait la péremption."""
+    from .models import PushSubscription
+
+    PushSubscription.objects.filter(pk=abonnement.pk).update(
+        date_dernier_envoi=timezone.now(), dernier_statut=statut
+    )
+
+
+def _envoyer_aux_abonnements(abonnements, titre, corps, url):
+    limite = timezone.now() - timedelta(days=_PEREMPTION_JOURS)
+    for abonnement in abonnements:
+        if abonnement.date_confirmation < limite:
+            logger.info(
+                "Abonnement push perime supprime (%s, derniere confirmation le %s)",
+                abonnement.user,
+                abonnement.date_confirmation.date(),
+            )
+            abonnement.delete()
+            continue
+        envoyer_push_a_abonnement(abonnement, titre, corps, url=url)
 
 
 def envoyer_push_a_utilisateur(user, titre, corps, url="/"):
@@ -72,19 +114,38 @@ def envoyer_push_a_utilisateur(user, titre, corps, url="/"):
     if not settings.VAPID_PRIVATE_KEY:
         return
 
-    limite = timezone.now() - timedelta(days=_PEREMPTION_JOURS)
-    for abonnement in user.push_subscriptions.all():
-        if abonnement.date_confirmation < limite:
-            logger.info(
-                "Abonnement push perime supprime (%s, derniere confirmation le %s)",
-                user,
-                abonnement.date_confirmation.date(),
-            )
-            abonnement.delete()
-            continue
-        envoyer_push_a_abonnement(abonnement, titre, corps, url=url)
+    _envoyer_aux_abonnements(list(user.push_subscriptions.all()), titre, corps, url)
 
 
 def envoyer_push_aux_utilisateurs(users, titre, corps, url="/"):
-    for user in users:
-        envoyer_push_a_utilisateur(user, titre, corps, url=url)
+    """Envoi en tâche de fond : ces notifications partent depuis la requête de
+    confirmation de commande, et un service de push lent ferait attendre la FOSA
+    pour un envoi dont elle n'est même pas destinataire. Le fil est détaché — une
+    notification perdue en cas de redémarrage du serveur est un moindre mal comparé
+    à une commande qui n'aboutit pas, et le SMS reste la voie garantie."""
+    if not settings.VAPID_PRIVATE_KEY:
+        return
+
+    # Les abonnements sont lus ICI, dans le fil de la requête : le fil détaché ne fait
+    # plus que du réseau, il n'a pas à rouvrir de connexion pour savoir à qui écrire.
+    from .models import PushSubscription
+
+    abonnements = list(PushSubscription.objects.filter(user__in=users).select_related("user"))
+    if not abonnements:
+        return
+
+    threading.Thread(
+        target=_envoyer_en_tache_de_fond, args=(abonnements, titre, corps, url), daemon=True
+    ).start()
+
+
+def _envoyer_en_tache_de_fond(abonnements, titre, corps, url):
+    try:
+        _envoyer_aux_abonnements(abonnements, titre, corps, url)
+    except Exception:  # noqa: BLE001 - un fil detache ne doit jamais remonter d'exception
+        logger.exception("Echec de l'envoi push en tache de fond")
+    finally:
+        # Le fil ouvre sa propre connexion des qu'il ecrit (trace d'envoi, suppression
+        # d'un abonnement revoque) : sans cette fermeture, elles s'accumuleraient
+        # jusqu'a saturer le pool de connexions Postgres.
+        connection.close()
