@@ -65,6 +65,31 @@ class WhatsAppLog(models.Model):
         return f"PDF commande #{self.commande_id} -> {self.destinataire} ({self.get_statut_envoi_display()})"
 
 
+class EmailLog(models.Model):
+    """Envoi d'un email de notification au personnel FRPS, tracé au même titre que
+    les SMS. Comme pour eux, une ligne « envoyé » signifie accepté par le relais,
+    pas lu par le destinataire — mais l'ABSENCE de ligne prouve, elle, qu'aucun
+    email n'est parti (typiquement : aucun compte FRPS n'a d'adresse renseignée)."""
+
+    destinataire = models.EmailField()
+    sujet = models.CharField(max_length=255)
+    type_evenement = models.CharField(max_length=32, choices=TypeEvenement.choices)
+    statut_envoi = models.CharField(max_length=16, choices=StatutEnvoi.choices)
+    commande = models.ForeignKey(
+        "commandes.Commande", on_delete=models.SET_NULL, null=True, blank=True, related_name="emails_envoyes"
+    )
+    date_envoi = models.DateTimeField(auto_now_add=True)
+    detail_erreur = models.TextField(blank=True)
+
+    class Meta:
+        verbose_name = "Email envoyé"
+        verbose_name_plural = "Emails envoyés"
+        ordering = ["-date_envoi"]
+
+    def __str__(self):
+        return f"{self.get_type_evenement_display()} -> {self.destinataire} ({self.get_statut_envoi_display()})"
+
+
 class Notification(models.Model):
     """Notification interne à l'application, gratuite et immédiate pour le
     personnel FRPS connecté — en complément du SMS (payant, dépendant du réseau)."""

@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Notification, PushSubscription, SMSLog, WhatsAppLog
+from .models import EmailLog, Notification, PushSubscription, SMSLog, WhatsAppLog
 
 
 @admin.register(SMSLog)
@@ -20,6 +20,17 @@ class WhatsAppLogAdmin(admin.ModelAdmin):
     list_filter = ("statut_envoi",)
     search_fields = ("destinataire",)
     readonly_fields = [f.name for f in WhatsAppLog._meta.fields]
+
+    def has_add_permission(self, request):
+        return False
+
+
+@admin.register(EmailLog)
+class EmailLogAdmin(admin.ModelAdmin):
+    list_display = ("destinataire", "sujet", "type_evenement", "statut_envoi", "commande", "date_envoi")
+    list_filter = ("type_evenement", "statut_envoi")
+    search_fields = ("destinataire", "sujet")
+    readonly_fields = [f.name for f in EmailLog._meta.fields]
 
     def has_add_permission(self, request):
         return False

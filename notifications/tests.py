@@ -5,6 +5,7 @@ from datetime import timedelta
 from decimal import Decimal
 from unittest.mock import patch
 
+from django.core import mail
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
@@ -12,9 +13,10 @@ from django.utils import timezone
 from accounts.models import FormationSanitaire, Role, User
 from catalogue.models import Produit
 from commandes import services as commande_services
+from commandes.models import StatutCommande
 from paiements import services as paiement_services
 
-from .models import Notification, PushSubscription
+from .models import EmailLog, Notification, PushSubscription, StatutEnvoi
 from .pdf import generer_pdf_commande, generer_token_pdf, verifier_token_pdf
 
 
@@ -285,3 +287,94 @@ class AbonnementPushTests(TestCase):
             termine.set()
 
         self.assertLess(duree, 1, "l'appelant a attendu la fin de l'envoi push")
+
+
+@override_settings(SMS_BACKEND="log", WHATSAPP_BACKEND="log", PAYMENT_GATEWAY="mock")
+class EmailNouvelleCommandeTests(TestCase):
+    """L'email part vers tout le personnel FRPS actif, jamais vers les FOSA :
+    c'est la FOSA qui valide la commande, la prévenir n'aurait pas de sens."""
+
+    def setUp(self):
+        self.stock = User.objects.create_user(
+            username="stock-mail", password="x", role=Role.PERSONNEL_STOCK, email="stock@frpsno.com"
+        )
+        self.compta = User.objects.create_user(
+            username="compta-mail", password="x", role=Role.PERSONNEL_COMPTABILITE, email="compta@frpsno.com"
+        )
+        self.admin = User.objects.create_user(
+            username="admin-mail", password="x", role=Role.ADMIN, email="admin@frpsno.com"
+        )
+        # Bruit volontaire : ces trois comptes ne doivent JAMAIS recevoir l'email.
+        User.objects.create_user(
+            username="stock-inactif", password="x", role=Role.PERSONNEL_STOCK,
+            email="inactif@frpsno.com", is_active=False,
+        )
+        User.objects.create_user(username="stock-sans-mail", password="x", role=Role.PERSONNEL_STOCK)
+        formation_user = User.objects.create_user(
+            username="csi-mail", password="x", role=Role.FORMATION_SANITAIRE, email="fosa@exemple.cm"
+        )
+        self.formation = FormationSanitaire.objects.create(
+            user=formation_user, nom="CSI Email", region="Nord", district="Garoua"
+        )
+        self.produit = Produit.objects.create(
+            code_sage="MED-MAIL", nom="Paracetamol 500 mg", prix_unitaire=Decimal("1500"), stock_disponible=10
+        )
+
+    def _confirmer_une_commande(self):
+        commande = commande_services.get_panier(self.formation)
+        commande_services.ajouter_produit(commande, self.produit, 3)
+        commande_services.confirmer_commande(commande)
+        return commande
+
+    def test_email_envoye_a_tout_le_personnel_frps_sauf_la_fosa(self):
+        self._confirmer_une_commande()
+
+        destinataires = sorted(adresse for message in mail.outbox for adresse in message.to)
+        self.assertEqual(destinataires, ["admin@frpsno.com", "compta@frpsno.com", "stock@frpsno.com"])
+        self.assertNotIn("fosa@exemple.cm", destinataires)
+        self.assertNotIn("inactif@frpsno.com", destinataires)
+
+    def test_email_porte_le_pdf_et_le_detail_de_la_commande(self):
+        commande = self._confirmer_une_commande()
+
+        message = mail.outbox[0]
+        self.assertIn(f"#{commande.pk}", message.subject)
+        self.assertIn("CSI Email", message.subject)
+        self.assertIn("Paracetamol 500 mg", message.body)
+        self.assertIn("4 500", message.body)  # 3 x 1500, montant arrondi et espace insecable
+
+        self.assertEqual(len(message.attachments), 1)
+        nom, contenu, type_mime = message.attachments[0]
+        self.assertEqual(nom, f"commande_{commande.pk}.pdf")
+        self.assertEqual(type_mime, "application/pdf")
+        self.assertTrue(contenu.startswith(b"%PDF"))
+
+    def test_chaque_envoi_est_trace(self):
+        commande = self._confirmer_une_commande()
+
+        traces = EmailLog.objects.filter(commande=commande)
+        self.assertEqual(traces.count(), 3)
+        self.assertTrue(all(t.statut_envoi == StatutEnvoi.ENVOYE for t in traces))
+
+    def test_aucun_compte_avec_email_ne_fait_rien_planter(self):
+        User.objects.filter(email__endswith="@frpsno.com").update(email="")
+
+        self._confirmer_une_commande()
+
+        self.assertEqual(mail.outbox, [])
+        self.assertEqual(EmailLog.objects.count(), 0)
+
+    def test_un_relais_smtp_en_panne_ne_fait_pas_echouer_la_commande(self):
+        with patch("notifications.emails.EmailMessage.send", side_effect=Exception("relais injoignable")):
+            commande = self._confirmer_une_commande()
+
+        # La commande reste validée et le stock débité malgré l'échec des emails.
+        commande.refresh_from_db()
+        self.produit.refresh_from_db()
+        self.assertEqual(commande.statut, StatutCommande.CONFIRMEE)
+        self.assertEqual(self.produit.stock_disponible, 7)
+
+        traces = EmailLog.objects.filter(commande=commande)
+        self.assertEqual(traces.count(), 3)
+        self.assertTrue(all(t.statut_envoi == StatutEnvoi.ECHEC for t in traces))
+        self.assertIn("relais injoignable", traces.first().detail_erreur)

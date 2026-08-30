@@ -1,3 +1,4 @@
+import logging
 import unicodedata
 
 from django.conf import settings
@@ -9,6 +10,8 @@ from frps_project.formatage import formater_montant
 from .backends import get_sms_backend
 from .models import Notification, SMSLog, StatutEnvoi, TypeEvenement, WhatsAppLog
 from .whatsapp import get_whatsapp_backend
+
+logger = logging.getLogger(__name__)
 
 
 def _sans_accents(texte):
@@ -97,6 +100,7 @@ def _formatter_lignes_complet(commande):
 def notifier_nouvelle_commande(commande):
     from accounts.models import Role, User
 
+    from .emails import envoyer_email_nouvelle_commande
     from .push import envoyer_push_aux_utilisateurs
 
     # SMS : reste ciblé sur le personnel concerné par ce type d'évènement (le stock
@@ -128,6 +132,18 @@ def notifier_nouvelle_commande(commande):
         f"{commande.formation_sanitaire.nom} - {formater_montant(commande.montant_total)} FCFA",
         url="/notifications/",
     )
+
+    # Email : même cible que le push — tout le personnel FRPS actif, à l'exclusion
+    # des FOSA, puisque c'est la FOSA qui vient de valider la commande. Avec le PDF
+    # joint, ce que la FOSA devait jusqu'ici partager à la main.
+    #
+    # Isolé dans un try/except : à ce stade la commande est validée et le stock déjà
+    # débité (commandes/services.py confirmer_commande). Un relais SMTP injoignable
+    # ne doit en aucun cas faire échouer la requête de la FOSA.
+    try:
+        envoyer_email_nouvelle_commande(commande)
+    except Exception:  # noqa: BLE001 - l'email ne doit jamais casser une validation
+        logger.exception("Commande #%s : envoi des emails interrompu", commande.pk)
 
 
 def notifier_paiement_confirme(commande):

@@ -38,6 +38,20 @@ services:
         sync: false
       - key: PUBLIC_BASE_URL
         value: "https://frps-commande.onrender.com"
+      - key: EMAIL_BACKEND_MODE
+        value: "smtp"
+      - key: EMAIL_HOST
+        value: "smtp-relay.brevo.com"
+      - key: EMAIL_PORT
+        value: "587"
+      - key: EMAIL_USE_TLS
+        value: "True"
+      - key: DEFAULT_FROM_EMAIL
+        value: "notifications@frpsno.com"
+      - key: EMAIL_HOST_USER
+        sync: false
+      - key: EMAIL_HOST_PASSWORD
+        sync: false
       - key: DJANGO_SUPERUSER_USERNAME
         sync: false
       - key: DJANGO_SUPERUSER_EMAIL
