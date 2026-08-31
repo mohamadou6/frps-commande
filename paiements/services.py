@@ -1,3 +1,4 @@
+from datetime import date as _date
 from decimal import Decimal, InvalidOperation
 
 from django.utils import timezone
@@ -59,7 +60,40 @@ def confirmer_paiement(paiement, succes: bool):
     return paiement
 
 
-def mettre_a_jour_paiement(commande, montant_verse_brut, user, methode=MethodePaiement.ESPECES):
+
+def _valider_date_paiement(valeur_brute, commande):
+    """Contrôle la date de règlement saisie à la main par la comptabilité.
+
+    Elle est saisie librement parce qu'une FOSA peut régler un jour et la saisie
+    n'intervenir que plus tard. Deux bornes s'imposent quand même : on ne peut pas
+    avoir payé une commande avant qu'elle existe, ni dans le futur.
+    """
+    if not valeur_brute:
+        return timezone.localdate()
+
+    if isinstance(valeur_brute, _date):
+        date_saisie = valeur_brute
+    else:
+        try:
+            date_saisie = _date.fromisoformat(str(valeur_brute).strip())
+        except ValueError:
+            raise ValueError("Date de paiement invalide (format attendu : JJ/MM/AAAA).")
+
+    if date_saisie > timezone.localdate():
+        raise ValueError("La date de paiement ne peut pas être dans le futur.")
+
+    if commande.date_confirmation and date_saisie < timezone.localtime(commande.date_confirmation).date():
+        raise ValueError(
+            "La date de paiement ne peut pas précéder la validation de la commande "
+            f"({timezone.localtime(commande.date_confirmation):%d/%m/%Y})."
+        )
+
+    return date_saisie
+
+
+def mettre_a_jour_paiement(
+    commande, montant_verse_brut, user, methode=MethodePaiement.ESPECES, date_paiement=None
+):
     """Saisie manuelle par le personnel comptabilité d'un nouveau versement reçu
     pour une commande payée hors application (espèces). Chaque appel ajoute un
     ReglementPaiement (l'historique) et incrémente Paiement.montant_paye d'autant
@@ -81,6 +115,8 @@ def mettre_a_jour_paiement(commande, montant_verse_brut, user, methode=MethodePa
     if methode not in MethodePaiement.values:
         raise ValueError("Moyen de paiement invalide.")
 
+    date_reelle = _valider_date_paiement(date_paiement, commande)
+
     paiement, _ = Paiement.objects.get_or_create(
         commande=commande,
         defaults={"montant": commande.montant_total, "methode": MethodePaiement.ESPECES},
@@ -93,7 +129,13 @@ def mettre_a_jour_paiement(commande, montant_verse_brut, user, methode=MethodePa
             f"Ce versement dépasse le solde restant dû ({restant} FCFA)."
         )
 
-    ReglementPaiement.objects.create(paiement=paiement, montant=montant_verse, methode=methode, saisi_par=user)
+    ReglementPaiement.objects.create(
+        paiement=paiement,
+        montant=montant_verse,
+        methode=methode,
+        date_paiement=date_reelle,
+        saisi_par=user,
+    )
 
     paiement.montant_paye = nouveau_total
     paiement.methode = methode

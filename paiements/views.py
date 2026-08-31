@@ -12,6 +12,7 @@
 from django.conf import settings
 from django.contrib import messages
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from accounts.decorators import (
@@ -128,6 +129,7 @@ def modifier_paiement(request, commande_id):
                 request.POST.get("montant_paye"),
                 request.user,
                 methode=request.POST.get("methode", MethodePaiement.ESPECES),
+                date_paiement=request.POST.get("date_paiement"),
             )
             messages.success(request, f"Versement enregistré : {montant_verse} FCFA reçus.")
             return redirect("paiements:gerer_paiements")
@@ -140,5 +142,11 @@ def modifier_paiement(request, commande_id):
             "commande": commande,
             "paiement": getattr(commande, "paiement", None),
             "methodes_paiement": MethodePaiement.choices,
+            # Bornes du sélecteur de date : la comptabilité saisit souvent après coup,
+            # mais jamais avant la validation de la commande ni dans le futur.
+            "aujourdhui": timezone.localdate(),
+            "date_min_paiement": (
+                timezone.localtime(commande.date_confirmation).date() if commande.date_confirmation else None
+            ),
         },
     )

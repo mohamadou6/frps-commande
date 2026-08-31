@@ -4,8 +4,16 @@ from .models import Paiement, ReglementPaiement
 
 
 class ReglementPaiementInline(admin.TabularInline):
+    """Historique des versements d'une commande.
+
+    Le montant et l'horodatage de saisie restent en lecture seule : ce sont des faits.
+    `date_paiement` et `methode` sont volontairement modifiables — une date de règlement
+    est saisie à la main, souvent après coup, donc corrigible en cas d'erreur.
+    """
+
     model = ReglementPaiement
     extra = 0
+    fields = ("montant", "date_paiement", "methode", "date_reglement", "saisi_par")
     readonly_fields = ("montant", "date_reglement", "saisi_par")
     can_delete = False
 

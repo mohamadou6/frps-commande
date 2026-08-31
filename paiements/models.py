@@ -2,6 +2,7 @@ from decimal import Decimal
 
 from django.conf import settings
 from django.db import models
+from django.utils import timezone
 
 
 class StatutPaiement(models.TextChoices):
@@ -14,6 +15,7 @@ class MethodePaiement(models.TextChoices):
     ORANGE_MONEY = "orange_money", "Orange Money"
     MTN_MOMO = "mtn_momo", "MTN Mobile Money"
     ESPECES = "especes", "Espèces (cash)"
+    VIREMENT_BANCAIRE = "virement_bancaire", "Virement bancaire"
 
 
 class EtatPaiement(models.TextChoices):
@@ -67,7 +69,16 @@ class ReglementPaiement(models.Model):
     paiement = models.ForeignKey(Paiement, on_delete=models.CASCADE, related_name="reglements")
     montant = models.DecimalField(max_digits=14, decimal_places=2)
     methode = models.CharField(max_length=32, choices=MethodePaiement.choices, default=MethodePaiement.ESPECES)
-    date_reglement = models.DateTimeField(auto_now_add=True)
+
+    # Deux dates volontairement distinctes : une FOSA peut régler un jour et la saisie
+    # n'être faite que plus tard. date_paiement porte la réalité comptable (saisie à la
+    # main, c'est elle qui fait foi), date_reglement l'horodatage technique de la saisie
+    # — non modifiable, il sert de piste d'audit.
+    date_paiement = models.DateField(
+        default=timezone.localdate,
+        help_text="Date à laquelle la FOSA a réellement réglé, qui peut précéder la saisie.",
+    )
+    date_reglement = models.DateTimeField(auto_now_add=True, help_text="Horodatage de la saisie dans l'application.")
     saisi_par = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
     )
@@ -75,7 +86,7 @@ class ReglementPaiement(models.Model):
     class Meta:
         verbose_name = "Règlement"
         verbose_name_plural = "Règlements"
-        ordering = ["date_reglement"]
+        ordering = ["date_paiement", "date_reglement"]
 
     def __str__(self):
-        return f"{self.montant} FCFA - commande #{self.paiement.commande_id} ({self.date_reglement:%d/%m/%Y})"
+        return f"{self.montant} FCFA - commande #{self.paiement.commande_id} ({self.date_paiement:%d/%m/%Y})"
