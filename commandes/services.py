@@ -1,3 +1,5 @@
+import logging
+
 from django.db import transaction
 from django.db.models import F
 from django.utils import timezone
@@ -5,6 +7,8 @@ from django.utils import timezone
 from catalogue.models import Produit
 
 from .models import Commande, LigneCommande, StatutCommande
+
+logger = logging.getLogger(__name__)
 
 
 class StockInsuffisantError(Exception):
@@ -78,3 +82,45 @@ def confirmer_commande(commande):
 
     notifier_nouvelle_commande(commande)
     return commande
+
+
+# Seuls ces statuts ont effectivement débité le stock (voir confirmer_commande).
+# Un brouillon n'a jamais rien débité : le recréditer gonflerait le stock.
+STATUTS_AYANT_DEBITE_LE_STOCK = (StatutCommande.CONFIRMEE, StatutCommande.PAYEE)
+
+
+def supprimer_commande(commande):
+    """Supprime une commande et remet en stock ce qu'elle avait débité.
+
+    Sert à corriger une commande validée par erreur par une FOSA. Réservé à l'admin
+    FRPS (voir la vue commandes.views.supprimer).
+
+    La suppression seule ne restaure PAS le stock — il est débité à la confirmation,
+    pas à la lecture. C'est toute la raison d'être de cette fonction : faire les deux
+    dans une seule transaction, pour qu'un échec ne laisse jamais un stock recrédité
+    sans commande supprimée, ni l'inverse.
+
+    Les lignes, le paiement éventuel et les notifications internes disparaissent en
+    cascade. Les SMSLog/EmailLog sont seulement détachés (`SET_NULL`) : ces envois ont
+    réellement eu lieu et coûté de l'argent, la piste d'audit doit survivre.
+    """
+    with transaction.atomic():
+        # verrou : empêche une suppression concurrente de recréditer le stock deux fois
+        commande = Commande.objects.select_for_update().get(pk=commande.pk)
+        reference = commande.pk
+        restaure = []
+        if commande.statut in STATUTS_AYANT_DEBITE_LE_STOCK:
+            for ligne in commande.lignes.select_related("produit"):
+                Produit.objects.filter(pk=ligne.produit_id).update(
+                    stock_disponible=F("stock_disponible") + ligne.quantite
+                )
+                restaure.append((ligne.produit.nom, ligne.quantite))
+        commande.delete()
+
+    logger.warning(
+        "Commande #%s supprimée (statut %s). Stock remis : %s",
+        reference,
+        commande.statut,
+        ", ".join(f"{nom} +{q}" for nom, q in restaure) or "aucun (pas de débit)",
+    )
+    return reference

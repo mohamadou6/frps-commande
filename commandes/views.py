@@ -3,7 +3,11 @@ from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
-from accounts.decorators import formation_sanitaire_only_required, personnel_frps_required
+from accounts.decorators import (
+    admin_frps_required,
+    formation_sanitaire_only_required,
+    personnel_frps_required,
+)
 from catalogue.models import Produit
 from notifications.pdf import generer_pdf_commande, verifier_token_pdf
 
@@ -142,3 +146,19 @@ def pdf_commande(request, commande_id, token):
     response = HttpResponse(pdf_bytes, content_type="application/pdf")
     response["Content-Disposition"] = f'inline; filename="commande_{commande.pk}.pdf"'
     return response
+
+
+@admin_frps_required
+@require_POST
+def supprimer(request, commande_id):
+    """Suppression d'une commande par l'admin FRPS, avec remise en stock.
+
+    Cas d'usage : une FOSA a validé une commande par erreur. Réservé à l'admin
+    (`admin_frps_required`) et en POST uniquement, pour qu'un simple lien visité — ou
+    préchargé par un navigateur — ne puisse pas détruire une commande.
+    """
+    commande = get_object_or_404(Commande, pk=commande_id)
+    libelle = f"#{commande.pk} de {commande.formation_sanitaire.nom}"
+    services.supprimer_commande(commande)
+    messages.success(request, f"Commande {libelle} supprimée. Le stock a été remis.")
+    return redirect(request.POST.get("suivant") or "statistiques:index")

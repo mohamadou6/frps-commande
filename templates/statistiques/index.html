@@ -57,16 +57,33 @@
         <h2 class="h6">Dernières commandes</h2>
         <div class="table-responsive">
         <table class="table table-striped">
-            <thead><tr><th>Formation sanitaire</th><th>Date</th><th>Montant</th></tr></thead>
+            <thead><tr><th>Formation sanitaire</th><th>Date</th><th>Montant</th>{% if user.is_admin_frps %}<th class="text-end">Actions</th>{% endif %}</tr></thead>
             <tbody>
                 {% for c in dernieres_commandes %}
                 <tr>
                     <td>{{ c.formation_sanitaire.nom }}</td>
                     <td>{{ c.date_confirmation|date:"d/m/Y H:i" }}</td>
                     <td>{{ c.montant_total|floatformat:0|intcomma }} FCFA</td>
+                    {% if user.is_admin_frps %}
+                    <td class="text-end text-nowrap">
+                        {% comment %}
+                        Suppression d'une commande validee par erreur par une FOSA.
+                        POST + confirmation : un lien simple serait declenchable par
+                        un prechargement de navigateur.
+                        {% endcomment %}
+                        <form method="post" action="{% url 'commandes:supprimer' c.pk %}"
+                              class="d-inline mb-0"
+                              onsubmit="return confirm('Supprimer definitivement la commande #{{ c.pk }} de {{ c.formation_sanitaire.nom|escapejs }} ({{ c.montant_total|floatformat:0 }} FCFA) ?
+
+Le stock des produits commandes sera remis. Cette action est irreversible.');">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-sm btn-outline-danger">Supprimer</button>
+                        </form>
+                    </td>
+                    {% endif %}
                 </tr>
                 {% empty %}
-                <tr><td colspan="3" class="text-center text-muted">Aucune commande pour le moment.</td></tr>
+                <tr><td colspan="{% if user.is_admin_frps %}4{% else %}3{% endif %}" class="text-center text-muted">Aucune commande pour le moment.</td></tr>
                 {% endfor %}
             </tbody>
         </table>
