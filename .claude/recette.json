@@ -1,0 +1,31 @@
+{
+  "_lisez_moi": "Vérifications propres au projet FRPS, exécutées par la skill django-recette. Chaque 'code' est passé à `manage.py shell -c`. Convention : la DERNIÈRE ligne imprimée commence par ALERTE si quelque chose cloche. C'est ici qu'on encode les pièges déjà payés une fois, pour ne jamais les rediagnostiquer.",
+
+  "verifications_orm": [
+    {
+      "nom": "SMS — nouvelle commande",
+      "commentaire": "notifications/services.py envoie aux rôles stock+admin actifs, en excluant les comptes sans téléphone. Si aucun n'en a, rien ne part : ni erreur, ni log.",
+      "code": "from django.db.models import Q; from accounts.models import User, Role; n = User.objects.filter(Q(role=Role.PERSONNEL_STOCK) | Q(role=Role.ADMIN), is_active=True).exclude(telephone='').count(); print('OK: %d destinataire(s) SMS' % n if n else 'ALERTE: aucun compte stock/admin actif avec telephone -> aucun SMS de nouvelle commande ne partira. Completer dans /admin/accounts/user/')"
+    },
+    {
+      "nom": "E-mail — personnel FRPS",
+      "commentaire": "notifications/emails.py envoie à tout le personnel actif SAUF les FOSA, en excluant les comptes sans email. Même piège que le SMS, mais celui-ci laisse un avertissement dans les logs.",
+      "code": "from accounts.models import User, Role; n = User.objects.filter(is_active=True).exclude(role=Role.FORMATION_SANITAIRE).exclude(email='').count(); print('OK: %d destinataire(s) e-mail' % n if n else 'ALERTE: aucun compte FRPS actif hors FOSA avec email -> aucune notification e-mail ne partira. Completer dans /admin/accounts/user/')"
+    },
+    {
+      "nom": "Catalogue commandable",
+      "commentaire": "Stock et prix sont saisis à la main par l'admin FRPS : un import sans prix rend le catalogue inutilisable pour les FOSA.",
+      "code": "from catalogue.models import Produit; n = Produit.objects.filter(actif=True, prix_unitaire__gt=0).count(); t = Produit.objects.count(); print('OK: %d produit(s) commandables sur %d' % (n, t) if n else 'ALERTE: aucun produit actif avec un prix > 0 -> le catalogue sera vide pour les FOSA')"
+    },
+    {
+      "nom": "Rayons de référence",
+      "commentaire": "Donnée de référence déployée par une migration de données (catalogue/0004_import_rayons_data.py), pas par une commande de gestion : le buildCommand Render n'est pas resynchronisé par le Blueprint.",
+      "code": "from catalogue.models import Rayon; n = Rayon.objects.count(); print('OK: %d rayon(s)' % n if n else 'ALERTE: aucun rayon -> le filtre par rayon sera vide, migration de donnees 0004 non appliquee')"
+    },
+    {
+      "nom": "Abonnements push vivants",
+      "commentaire": "Informatif. Un jeton fantôme est accepté par FCM (201) sans rien livrer : seule l'absence de reconfirmation depuis 45 j le trahit.",
+      "code": "from datetime import timedelta; from django.utils import timezone; from notifications.models import PushSubscription; limite = timezone.now() - timedelta(days=45); vivants = PushSubscription.objects.filter(date_confirmation__gte=limite).count(); perimes = PushSubscription.objects.filter(date_confirmation__lt=limite).count(); print('OK: %d abonnement(s) vivant(s), %d perime(s) a purger' % (vivants, perimes))"
+    }
+  ]
+}
