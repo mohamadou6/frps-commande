@@ -37,7 +37,7 @@
     {% csrf_token %}
     <div class="col-12 col-md-3">
         <label class="form-label">Nouveau versement reçu (FCFA)</label>
-        <input type="number" step="0.01" min="0.01" max="{{ commande.solde_restant|unlocalize }}" name="montant_paye"
+        <input type="number" step="1" min="1" max="{{ commande.solde_restant|unlocalize }}" name="montant_paye"
                placeholder="Montant de ce règlement" class="form-control" required>
     </div>
     <div class="col-12 col-md-3">
@@ -96,7 +96,7 @@
             <td>{{ ligne.produit.nom }}</td>
             <td>{{ ligne.quantite }}</td>
             <td>{{ ligne.prix_unitaire_snapshot }} FCFA</td>
-            <td>{{ ligne.sous_total|floatformat:"0" }} FCFA</td>
+            <td>{{ ligne.sous_total|floatformat:"2" }} FCFA</td>
         </tr>
         {% endfor %}
     </tbody>

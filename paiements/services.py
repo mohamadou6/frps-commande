@@ -4,6 +4,7 @@ from decimal import Decimal, InvalidOperation
 from django.utils import timezone
 
 from commandes.models import StatutCommande
+from frps_project.formatage import formater_montant
 
 from .gateways import get_payment_gateway
 from .models import MethodePaiement, Paiement, ReglementPaiement, StatutPaiement
@@ -112,6 +113,11 @@ def mettre_a_jour_paiement(
     if montant_verse <= 0:
         raise ValueError("Le montant versé doit être supérieur à 0.")
 
+    # Un versement à décimales referait apparaître des centimes dans le montant payé
+    # et le solde, alors que le total de la commande est un nombre entier de FCFA.
+    if montant_verse != montant_verse.to_integral_value():
+        raise ValueError("Le montant versé doit être un nombre entier de FCFA, sans décimales.")
+
     if methode not in MethodePaiement.values:
         raise ValueError("Moyen de paiement invalide.")
 
@@ -126,7 +132,7 @@ def mettre_a_jour_paiement(
     if nouveau_total > commande.montant_total:
         restant = commande.montant_total - paiement.montant_paye
         raise ValueError(
-            f"Ce versement dépasse le solde restant dû ({restant} FCFA)."
+            f"Ce versement dépasse le solde restant dû ({formater_montant(restant)} FCFA)."
         )
 
     ReglementPaiement.objects.create(

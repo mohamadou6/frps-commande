@@ -120,7 +120,7 @@ def generer_pdf_commande(commande) -> bytes:
             rangee.cell(ligne.produit.nom)
             rangee.cell(str(ligne.quantite))
             rangee.cell(f"{formater_prix(ligne.prix_unitaire_snapshot)} FCFA")
-            rangee.cell(f"{formater_montant(ligne.sous_total)} FCFA")
+            rangee.cell(f"{formater_prix(ligne.sous_total)} FCFA")
 
     pdf.ln(2)
     pdf.set_font("Helvetica", "B", 12)

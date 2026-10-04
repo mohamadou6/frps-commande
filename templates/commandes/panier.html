@@ -47,7 +47,7 @@
                 </form>
             </td>
             <td>{{ ligne.prix_unitaire_snapshot }} FCFA</td>
-            <td>{{ ligne.sous_total|floatformat:"0" }} FCFA</td>
+            <td>{{ ligne.sous_total|floatformat:"2" }} FCFA</td>
             <td>
                 <form method="post" action="{% url 'commandes:retirer' ligne.produit.id %}">
                     {% csrf_token %}

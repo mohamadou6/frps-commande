@@ -59,7 +59,7 @@ def _corps_nouvelle_commande(commande):
     for ligne in lignes:
         detail.append(
             f"  - {ligne.produit.nom} : {ligne.quantite} x {formater_prix(ligne.prix_unitaire_snapshot)}"
-            f" = {formater_montant(ligne.sous_total)} FCFA"
+            f" = {formater_prix(ligne.sous_total)} FCFA"
         )
 
     pied = [

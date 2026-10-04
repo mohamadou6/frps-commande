@@ -4,6 +4,7 @@ from django.conf import settings
 from django.core.mail import send_mail
 
 from accounts.models import Role, User
+from frps_project.formatage import formater_montant
 
 from .services import donnees_tableau_de_bord
 
@@ -14,7 +15,7 @@ def _formatter_rapport_texte(donnees):
         "=" * 60,
         "",
         f"Commandes sur la période : {donnees['nb_commandes_periode']}",
-        f"Montant total : {donnees['montant_periode']} FCFA",
+        f"Montant total : {formater_montant(donnees['montant_periode'])} FCFA",
         f"Formations sanitaires actives : {donnees['nb_fosa_actives']}",
         f"Produits en rupture : {donnees['nb_rupture']}",
         f"Produits menacés de rupture : {donnees['nb_menace']}",
@@ -40,7 +41,8 @@ def _formatter_rapport_texte(donnees):
         for commande in donnees["dernieres_commandes"]:
             date_str = commande.date_confirmation.strftime("%d/%m/%Y %H:%M") if commande.date_confirmation else "-"
             lignes.append(
-                f"  - #{commande.pk} {commande.formation_sanitaire.nom} — {date_str} — {commande.montant_total} FCFA"
+                f"  - #{commande.pk} {commande.formation_sanitaire.nom} — {date_str}"
+                f" — {formater_montant(commande.montant_total)} FCFA"
             )
     else:
         lignes.append("  (aucune commande sur cette période)")

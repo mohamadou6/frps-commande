@@ -1,10 +1,15 @@
+import contextlib
+import importlib
+import io
 from decimal import Decimal
 
+from django.apps import apps as django_apps
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from accounts.models import FormationSanitaire, Role, User
 from catalogue.models import Produit
+from frps_project.formatage import formater_montant
 from notifications.models import SMSLog
 
 from . import services
@@ -170,3 +175,67 @@ class SupprimerCommandeTests(TestCase):
 
         self.client.force_login(self.stock_user)
         self.assertNotContains(self.client.get(reverse("statistiques:index")), "Supprimer")
+
+
+@override_settings(SMS_BACKEND="log", WHATSAPP_BACKEND="log")
+class ArrondiDesMontantsTests(TestCase):
+    """Le prix unitaire et le total de chaque ligne gardent leurs décimales ; seul le
+    total général est arrondi au FCFA — en base, pas seulement à l'écran, sinon le
+    solde d'une commande réglée ne tombe jamais à zéro."""
+
+    def setUp(self):
+        self.fosa_user = User.objects.create_user(
+            username="csi-arrondi", password="x", role=Role.FORMATION_SANITAIRE
+        )
+        self.formation = FormationSanitaire.objects.create(user=self.fosa_user, nom="CSI Arrondi")
+
+    def _commande(self, *lignes):
+        commande = services.get_panier(self.formation)
+        for code, prix, quantite in lignes:
+            produit = Produit.objects.create(
+                code_sage=code, nom=code, prix_unitaire=Decimal(prix), stock_disponible=100
+            )
+            services.ajouter_produit(commande, produit, quantite)
+        return commande
+
+    def test_le_total_general_est_arrondi_les_lignes_gardent_leurs_decimales(self):
+        commande = self._commande(("A", "419.10", 3), ("B", "42.24", 10), ("C", "12.80", 3))
+
+        services.confirmer_commande(commande)
+
+        commande.refresh_from_db()
+        self.assertEqual(
+            sorted(ligne.sous_total for ligne in commande.lignes.all()),
+            [Decimal("38.40"), Decimal("422.40"), Decimal("1257.30")],
+        )
+        self.assertEqual(commande.montant_total, Decimal("1718"))  # 1 718,10 au centime près
+
+    def test_un_total_en_virgule_cinquante_monte_au_franc_superieur(self):
+        """`round()` de Python arrondit au pair : 12 344,50 donnait 12 344 sur le PDF
+        quand l'écran affichait 12 345."""
+        commande = self._commande(("D", "12344.50", 1))
+
+        commande.refresh_from_db()
+        self.assertEqual(commande.montant_total, Decimal("12345"))
+        self.assertEqual(formater_montant(Decimal("12344.50")), "12 345")
+
+    def test_la_page_affiche_la_ligne_avec_decimales_et_le_total_arrondi(self):
+        commande = self._commande(("A", "419.10", 3), ("B", "42.24", 10), ("C", "12.80", 3))
+        services.confirmer_commande(commande)
+        self.client.force_login(self.fosa_user)
+
+        page = self.client.get(reverse("commandes:detail", args=[commande.pk])).content.decode()
+
+        self.assertIn("1\xa0257,30 FCFA", page)
+        self.assertIn("Total : 1\xa0718 FCFA", page)
+
+    def test_la_migration_arrondit_les_commandes_deja_passees(self):
+        commande = self._commande(("E", "1718.60", 1))
+        Commande.objects.filter(pk=commande.pk).update(montant_total=Decimal("1718.60"))
+        migration = importlib.import_module("commandes.migrations.0002_arrondir_montants_totaux")
+
+        with contextlib.redirect_stdout(io.StringIO()):
+            migration.arrondir_montants_totaux(django_apps, None)
+
+        commande.refresh_from_db()
+        self.assertEqual(commande.montant_total, Decimal("1719"))

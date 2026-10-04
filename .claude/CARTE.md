@@ -1,10 +1,10 @@
 # Carte du code — commande-frps
 
-<!-- Genere par la skill carte-du-code le 2026-09-03. NE PAS EDITER A LA MAIN : relancer scripts/generer_carte.py. -->
+<!-- Genere par la skill carte-du-code le 2026-10-04. NE PAS EDITER A LA MAIN : relancer scripts/generer_carte.py. -->
 
 **Lire ce fichier avant d'explorer le depot.** Il donne `fichier:ligne` pour chaque modele, URL, vue et fonction.
 
-9 modules · 13 modeles · 46 URLs · 95 fonctions · 20 gabarits · 5152 lignes de Python
+9 modules · 13 modeles · 46 URLs · 96 fonctions · 20 gabarits · 5310 lignes de Python
 
 ## accounts (339 lignes)
 
@@ -21,12 +21,15 @@
 
 ### `accounts/management/commands/ensure_admin.py` (32 l.)
 - *classe* **Command**(BaseCommand) :7 — Crée le compte admin FRPS s'il n'existe pas encore, à partir des variables
+  - methodes : handle() :16
 
 ### `accounts/management/commands/import_fosa.py` (71 l.)
 - *classe* **Command**(BaseCommand) :13 — Importe le référentiel des formations sanitaires (région/district/nom) depuis
+  - methodes : handle() :25, _username_unique() :63
 
 ### `accounts/management/commands/seed_demo.py` (36 l.)
 - *classe* **Command**(BaseCommand) :6
+  - methodes : handle() :9
 
 ### `accounts/models.py` (61 l.)
 - *enum* **Role** :5 — ADMIN, FORMATION_SANITAIRE, PERSONNEL_STOCK, PERSONNEL_COMPTABILITE
@@ -38,6 +41,7 @@
 
 ### `accounts/views.py` (22 l.)
 - *classe* **LoginView**(LoginView) :8 — Redirige après connexion selon le rôle : catalogue pour les formations
+  - methodes : get_success_url() :18
 
 ## catalogue (578 lignes)
 
@@ -47,12 +51,15 @@
 
 ### `catalogue/management/commands/import_catalogue.py` (70 l.)
 - *classe* **Command**(BaseCommand) :21 — Importe/actualise le catalogue depuis catalogue/data/produits_magasin_principal.csv
+  - methodes : handle() :29
 
 ### `catalogue/management/commands/import_rayons.py` (63 l.)
 - *classe* **Command**(BaseCommand) :23 — Crée/actualise les rayons puis rattache les produits selon
+  - methodes : handle() :31
 
 ### `catalogue/management/commands/update_stock.py` (131 l.)
 - *classe* **Command**(BaseCommand) :72 — Met à jour prix_unitaire/stock_disponible depuis un fichier CSV fourni par
+  - methodes : add_arguments() :86, handle() :90
 - `_read_updates_with_code_sage(path)` :23 — Fichier avec code_sage (colonnes code_sage;nom;...;prix_unitaire;stock_disponible,
 - `_read_updates_by_position(update_csv)` :45 — Fichier sans code_sage (colonnes nom;prix_unitaire;stock_disponible). Le nom seul
 
@@ -75,7 +82,7 @@
 - `_lire_fichier_produits(fichier)` :85 — Lit un classeur Excel dont l'en-tête contient une colonne code produit
 - `importer_produits(request)` :133 @admin_frps_required
 
-## commandes (598 lignes)
+## commandes (677 lignes)
 
 ### `commandes/admin.py` (20 l.)
 - *admin* **LigneCommandeInline** :6
@@ -84,14 +91,14 @@
 ### `commandes/context_processors.py` (18 l.)
 - `panier_resume(request)` :4 — Nombre de lignes du panier en cours, pour le badge de la navbar : sans lui,
 
-### `commandes/models.py` (75 l.)
-- *enum* **StatutCommande** :7 — BROUILLON, CONFIRMEE, PAYEE, ANNULEE
-- *modele* **Commande** :14
+### `commandes/models.py` (85 l.)
+- *enum* **StatutCommande** :9 — BROUILLON, CONFIRMEE, PAYEE, ANNULEE
+- *modele* **Commande** :16
   - champs : formation_sanitaire(ForeignKey ->accounts.FormationSanitaire related_name=commandes), statut(Char choices=StatutCommande.choices), montant_total(Decimal), date_creation(DateTime), date_confirmation(DateTime)
-  - methodes : recalculer_montant() :31, montant_paye() :38, solde_restant() :43, etat_paiement() :47
-- *modele* **LigneCommande** :56
+  - methodes : recalculer_montant() :33, montant_paye() :44, solde_restant() :49, etat_paiement() :57
+- *modele* **LigneCommande** :66
   - champs : commande(ForeignKey ->Commande related_name=lignes), produit(ForeignKey ->catalogue.Produit related_name=lignes_commande), quantite(PositiveInteger), prix_unitaire_snapshot(Decimal)
-  - methodes : sous_total() :71
+  - methodes : sous_total() :81
 
 ### `commandes/services.py` (127 l.)
 - *classe* **StockInsuffisantError**(Exception) :14
@@ -101,13 +108,15 @@
 - `confirmer_commande(commande)` :55 — Verrouille la commande, débite le stock, notifie le personnel FRPS chargé du stock.
 - `supprimer_commande(commande)` :92 — Supprime une commande et remet en stock ce qu'elle avait débité.
 
-### `commandes/tests.py` (173 l.)
-- *classe* **CommandeWorkflowTests**(TestCase) :15
+### `commandes/tests.py` (242 l.)
+- *classe* **CommandeWorkflowTests**(TestCase) :20
   - tests : test_ajouter_produit_respecte_le_stock, test_confirmer_commande_notifie_personnel_stock, test_confirmer_panier_vide_leve_une_erreur
-- *classe* **TelechargerPdfTests**(TestCase) :51
+- *classe* **TelechargerPdfTests**(TestCase) :56
   - tests : test_le_proprietaire_peut_telecharger_le_pdf, test_un_autre_utilisateur_ne_peut_pas_telecharger
-- *classe* **SupprimerCommandeTests**(TestCase) :82 — Suppression d'une commande validée par erreur par une FOSA, réservée à l'admin.
+- *classe* **SupprimerCommandeTests**(TestCase) :87 — Suppression d'une commande validée par erreur par une FOSA, réservée à l'admin.
   - tests : test_supprimer_une_commande_confirmee_remet_le_stock, test_supprimer_un_brouillon_ne_gonfle_pas_le_stock, test_admin_peut_supprimer_via_le_bouton, test_personnel_non_admin_ne_peut_pas_supprimer, test_fosa_ne_peut_pas_supprimer_sa_propre_commande, test_un_simple_GET_ne_supprime_rien, test_le_bouton_n_apparait_que_pour_l_admin
+- *classe* **ArrondiDesMontantsTests**(TestCase) :181 — Le prix unitaire et le total de chaque ligne gardent leurs décimales ; seul le
+  - tests : test_le_total_general_est_arrondi_les_lignes_gardent_leurs_decimales, test_un_total_en_virgule_cinquante_monte_au_franc_superieur, test_la_page_affiche_la_ligne_avec_decimales_et_le_total_arrondi, test_la_migration_arrondit_les_commandes_deja_passees
 
 ### `commandes/urls.py` (20 l.)
 - URL `''` -> views.panier  `commandes:panier` :8
@@ -135,13 +144,12 @@
 - `pdf_commande(request, commande_id, token)` :139 — Sert le PDF de la commande sans authentification : accès protégé par un jeton
 - `supprimer(request, commande_id)` :153 @admin_frps_required @require_POST — Suppression d'une commande par l'admin FRPS, avec remise en stock.
 
-## deploy (26 lignes)
+## frps_project (366 lignes)
 
-## frps_project (352 lignes)
-
-### `frps_project/formatage.py` (15 l.)
-- `formater_montant(valeur)` :1 — Montant arrondi (sans décimales), séparateur de milliers. Pour un prix
-- `formater_prix(valeur)` :7 — Prix unitaire : décimales conservées, séparateur de milliers ajouté.
+### `frps_project/formatage.py` (29 l.)
+- `arrondir_montant(valeur)` :4 — Total général ramené au FCFA entier, demi vers le haut (12,50 -> 13).
+- `formater_montant(valeur)` :13 — Total général : arrondi (sans décimales), séparateur de milliers. Pour un
+- `formater_prix(valeur)` :20 — Prix unitaire ou total d'une ligne : décimales conservées, séparateur de
 
 ### `frps_project/pwa.py` (81 l.)
 - `service_worker(request)` :29 @require_GET @cache_control — `no-cache` : le navigateur doit revalider le fichier pour voir les mises à jour.
@@ -190,11 +198,17 @@
 
 ### `notifications/backends.py` (284 l.)
 - *classe* **SMSBackend**(ABC) :9 — Interface d'envoi de SMS. Une seule méthode à implémenter par backend.
+  - methodes : send() :13
 - *classe* **LogSMSBackend**(SMSBackend) :20 — Backend par défaut tant qu'aucune passerelle SMS réelle n'est branchée.
+  - methodes : send() :27
 - *classe* **TwilioSMSBackend**(SMSBackend) :32 — Envoi réel de SMS via Twilio.
+  - methodes : send() :40
 - *classe* **OrangeSMSBackend**(SMSBackend) :71 — Envoi réel de SMS via l'API Orange Developer (SMS API), pour une bien
+  - methodes : _obtenir_jeton() :82, send() :107
 - *classe* **MTNSMSBackend**(SMSBackend) :153 — Envoi réel de SMS via l'API MTN Developer (produit "SMS V2"), pour une
+  - methodes : _obtenir_jeton() :173, send() :191
 - *classe* **RealSMSBackend**(SMSBackend) :245 — Squelette générique pour une autre passerelle SMS réelle.
+  - methodes : send() :252
 - `verifier_statut_livraison_mtn(transaction_id)` :226 — Interroge l'API MTN (GET deliveryStatus) pour connaître le vrai statut de
 - `get_sms_backend()` :273
 
@@ -221,6 +235,7 @@
 
 ### `notifications/pdf.py` (131 l.)
 - *classe* **CommandePDF**(FPDF) :37 — En-tête (mention République/Région/FRPS + logo) et pied de page (logos des
+  - methodes : header() :42, footer() :68
 - `generer_token_pdf(commande_id)` :24 — Jeton signé permettant de récupérer le PDF sans authentification (utilisé par Twilio).
 - `verifier_token_pdf(commande_id, token)` :29
 - `generer_pdf_commande(commande)` :83 — Génère le PDF récapitulatif d'une commande validée (pour envoi WhatsApp).
@@ -274,12 +289,16 @@
 
 ### `notifications/whatsapp.py` (119 l.)
 - *classe* **WhatsAppBackend**(ABC) :9
+  - methodes : send_document() :11
 - *classe* **LogWhatsAppBackend**(WhatsAppBackend) :23 — Backend par défaut tant qu'aucune API WhatsApp réelle n'est branchée.
+  - methodes : send_document() :26
 - *classe* **TwilioWhatsAppBackend**(WhatsAppBackend) :33 — Envoi réel via l'API WhatsApp de Twilio.
+  - methodes : send_document() :47
 - *classe* **RealWhatsAppBackend**(WhatsAppBackend) :78 — Squelette pour l'API WhatsApp Business (Meta Cloud API).
+  - methodes : send_document() :88
 - `get_whatsapp_backend()` :112
 
-## paiements (701 lignes)
+## paiements (764 lignes)
 
 ### `paiements/admin.py` (36 l.)
 - *admin* **ReglementPaiementInline** :6
@@ -287,8 +306,11 @@
 
 ### `paiements/gateways.py` (82 l.)
 - *classe* **PaymentGateway**(ABC) :10
+  - methodes : initiate_payment() :12, handle_callback() :17
 - *classe* **MockOrangeMoneyGateway**(PaymentGateway) :22 — Simule Orange Money : confirme immédiatement le paiement.
+  - methodes : initiate_payment() :29, handle_callback() :34
 - *classe* **OrangeMoneyGateway**(PaymentGateway) :38 — Squelette d'intégration API Orange Money Cameroun (Web Payment).
+  - methodes : initiate_payment() :47, handle_callback() :70
 - `get_payment_gateway()` :77
 
 ### `paiements/models.py` (93 l.)
@@ -301,18 +323,20 @@
 - *modele* **ReglementPaiement** :64 — Un versement individuel (espèces) reçu pour une commande, saisi par le
   - champs : paiement(ForeignKey ->Paiement related_name=reglements), montant(Decimal), methode(Char choices=MethodePaiement.choices), date_paiement(Date), date_reglement(DateTime), saisi_par(ForeignKey ->settings.AUTH_USER_MODEL related_name=+)
 
-### `paiements/services.py` (146 l.)
-- `initier_paiement(commande)` :12 — Initie un paiement Orange Money (le client règle sur le compte Orange Money du FRPS).
-- `payer_en_especes(commande)` :28 — Valide directement la commande en paiement espèces : aucune étape supplémentaire.
-- `confirmer_paiement(paiement, succes)` :44
-- `_valider_date_paiement(valeur_brute, commande)` :64 — Contrôle la date de règlement saisie à la main par la comptabilité.
-- `mettre_a_jour_paiement(commande, montant_verse_brut, user, methode, date_paiement)` :94 — Saisie manuelle par le personnel comptabilité d'un nouveau versement reçu
+### `paiements/services.py` (152 l.)
+- `initier_paiement(commande)` :13 — Initie un paiement Orange Money (le client règle sur le compte Orange Money du FRPS).
+- `payer_en_especes(commande)` :29 — Valide directement la commande en paiement espèces : aucune étape supplémentaire.
+- `confirmer_paiement(paiement, succes)` :45
+- `_valider_date_paiement(valeur_brute, commande)` :65 — Contrôle la date de règlement saisie à la main par la comptabilité.
+- `mettre_a_jour_paiement(commande, montant_verse_brut, user, methode, date_paiement)` :95 — Saisie manuelle par le personnel comptabilité d'un nouveau versement reçu
 
-### `paiements/tests.py` (175 l.)
-- *classe* **PaiementWorkflowTests**(TestCase) :18
+### `paiements/tests.py` (231 l.)
+- *classe* **PaiementWorkflowTests**(TestCase) :19
   - tests : test_confirmer_paiement_marque_commande_payee_et_notifie_comptabilite, test_paiement_echoue_ne_notifie_pas, test_confirmer_paiement_ne_declenche_plus_l_envoi_whatsapp_automatique, test_payer_en_especes_valide_directement_sans_etape_supplementaire
-- *classe* **DateDeReglementTests**(TestCase) :68 — La FOSA règle un jour, la comptabilité saisit parfois bien plus tard. C'est la
+- *classe* **DateDeReglementTests**(TestCase) :69 — La FOSA règle un jour, la comptabilité saisit parfois bien plus tard. C'est la
   - tests : test_la_date_saisie_est_conservee_telle_quelle, test_sans_date_fournie_le_jour_meme_est_retenu, test_une_date_future_est_refusee, test_une_date_anterieure_a_la_commande_est_refusee, test_une_date_illisible_est_refusee, test_plusieurs_reglements_partiels_gardent_chacun_leur_date, test_le_virement_bancaire_est_un_moyen_accepte, test_le_formulaire_propose_la_date_et_les_quatre_moyens, test_l_historique_affiche_les_deux_dates
+- *classe* **VersementsEnFrancsEntiersTests**(TestCase) :179 — Le total d'une commande est un nombre entier de FCFA : les versements aussi,
+  - tests : test_la_commande_se_solde_avec_le_montant_affiche, test_un_versement_a_decimales_est_refuse, test_un_ancien_reglement_a_centimes_ne_laisse_pas_la_commande_partielle, test_le_formulaire_n_accepte_que_des_francs_entiers
 
 ### `paiements/urls.py` (16 l.)
 - URL `gerer/` -> views.gerer_paiements  `paiements:gerer_paiements` :8
@@ -323,23 +347,24 @@
 - URL `<int:commande_id>/succes/` -> views.succes  `paiements:succes` :13
 - URL `<int:commande_id>/modifier/` -> views.modifier_paiement  `paiements:modifier_paiement` :14
 
-### `paiements/views.py` (153 l.)
-- `payer(request, commande_id)` :30 @formation_sanitaire_only_required
-- `initier(request, commande_id)` :52 @formation_sanitaire_only_required @require_POST
-- `payer_especes(request, commande_id)` :66 @formation_sanitaire_only_required @require_POST — Valide la commande en paiement espèces : aucune étape supplémentaire.
-- `confirmer_mock(request, commande_id)` :85 @formation_sanitaire_only_required @require_POST — Simule le callback Orange Money (uniquement utile en mode mock/démo).
-- `succes(request, commande_id)` :100 @formation_sanitaire_only_required
-- `gerer_paiements(request)` :108 @personnel_frps_required — Liste consultable par tout le personnel FRPS (stock inclus, en lecture) ; seule
-- `modifier_paiement(request, commande_id)` :123 @comptabilite_frps_required
+### `paiements/views.py` (154 l.)
+- `payer(request, commande_id)` :31 @formation_sanitaire_only_required
+- `initier(request, commande_id)` :53 @formation_sanitaire_only_required @require_POST
+- `payer_especes(request, commande_id)` :67 @formation_sanitaire_only_required @require_POST — Valide la commande en paiement espèces : aucune étape supplémentaire.
+- `confirmer_mock(request, commande_id)` :86 @formation_sanitaire_only_required @require_POST — Simule le callback Orange Money (uniquement utile en mode mock/démo).
+- `succes(request, commande_id)` :101 @formation_sanitaire_only_required
+- `gerer_paiements(request)` :109 @personnel_frps_required — Liste consultable par tout le personnel FRPS (stock inclus, en lecture) ; seule
+- `modifier_paiement(request, commande_id)` :124 @comptabilite_frps_required
 
-## statistiques (517 lignes)
+## statistiques (519 lignes)
 
 ### `statistiques/management/commands/envoyer_rapport.py` (33 l.)
 - *classe* **Command**(BaseCommand) :6 — Envoie le rapport d'activité périodique par email aux comptes admin actifs
+  - methodes : add_arguments() :18, handle() :25
 
-### `statistiques/rapports.py` (86 l.)
-- `destinataires_rapport()` :55 — Comptes admin actifs avec un email renseigné. Reproduit le même filtre que
-- `envoyer_rapport_periodique(jours, destinataires)` :63 — Génère et envoie le rapport d'activité des `jours` derniers jours aux
+### `statistiques/rapports.py` (88 l.)
+- `destinataires_rapport()` :57 — Comptes admin actifs avec un email renseigné. Reproduit le même filtre que
+- `envoyer_rapport_periodique(jours, destinataires)` :65 — Génère et envoie le rapport d'activité des `jours` derniers jours aux
 
 ### `statistiques/services.py` (70 l.)
 - `donnees_tableau_de_bord(debut, fin)` :10 — Rassemble les indicateurs du tableau de bord (statistiques:index) pour une
@@ -362,12 +387,16 @@
 
 ### `stock_sync/connectors.py` (113 l.)
 - *classe* **StockConnector**(ABC) :7 — Source du stock. Retourne une liste de dicts avec les clés :
+  - methodes : fetch_produits() :13
 - *classe* **MockStockConnector**(StockConnector) :17 — Données d'exemple, utilisées tant que l'accès au SQL Server du FRPS
+  - methodes : fetch_produits() :22
 - *classe* **SageSQLServerConnector**(StockConnector) :62 — Connexion en lecture seule au SQL Server du FRPS (Sage Gescom).
+  - methodes : fetch_produits() :75
 - `get_stock_connector()` :108
 
 ### `stock_sync/management/commands/sync_stock.py` (36 l.)
 - *classe* **Command**(BaseCommand) :8
+  - methodes : handle() :12
 
 ## Commandes de gestion
 

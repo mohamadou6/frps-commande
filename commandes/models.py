@@ -3,6 +3,8 @@ from decimal import Decimal
 from django.conf import settings
 from django.db import models
 
+from frps_project.formatage import arrondir_montant
+
 
 class StatutCommande(models.TextChoices):
     BROUILLON = "brouillon", "Brouillon (panier)"
@@ -29,7 +31,11 @@ class Commande(models.Model):
         return f"Commande #{self.pk} - {self.formation_sanitaire.nom} ({self.get_statut_display()})"
 
     def recalculer_montant(self):
-        total = sum((ligne.sous_total for ligne in self.lignes.all()), Decimal("0"))
+        # Les lignes gardent leurs décimales ; seul le total général est arrondi, et il
+        # l'est ici, à l'enregistrement, pas seulement à l'affichage : le solde et l'état
+        # de paiement se calculent ainsi sur le montant que tout le monde voit, et non
+        # sur des centimes invisibles qui laissaient une commande réglée « partielle ».
+        total = arrondir_montant(sum((ligne.sous_total for ligne in self.lignes.all()), Decimal("0")))
         self.montant_total = total
         self.save(update_fields=["montant_total"])
         return total
@@ -41,7 +47,11 @@ class Commande(models.Model):
 
     @property
     def solde_restant(self):
-        return self.montant_total - self.montant_paye
+        # Totaux et versements sont des FCFA entiers. Seul un règlement saisi avant
+        # l'arrondi des totaux peut laisser un écart de centimes : il n'est pas
+        # encaissable, et ne doit ni afficher un solde, ni bloquer l'état « payée ».
+        solde = self.montant_total - self.montant_paye
+        return solde if solde >= 1 else Decimal("0")
 
     @property
     def etat_paiement(self):

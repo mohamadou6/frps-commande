@@ -55,9 +55,10 @@ pas `btn-success` : une seule source pour toute l'application.
 **Mobile d'abord.** La navbar se replie sous 992 px, les liens passent en pleine largeur.
 Toute nouvelle page se vérifie à 375 px de large.
 
-**Montants arrondis sans décimales** partout — gabarits, PDF, SMS — via
-`floatformat:"0"` et `frps_project/formatage.py`. **Sauf le prix unitaire**, qui garde
-ses décimales : choix explicite, ne pas uniformiser.
+**Montants : deux régimes, ne pas uniformiser.** Le **prix unitaire** et le **total
+d'une ligne** gardent leurs décimales (`floatformat:"2"`, `formater_prix`). **Tout total
+général** — commande, payé, solde, statistiques — s'affiche sans décimales
+(`floatformat:"0"`, `formater_montant`) ; il est d'ailleurs déjà entier en base.
 
 ## Ajouter une page
 

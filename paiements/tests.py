@@ -8,10 +8,11 @@ from django.utils import timezone
 from accounts.models import FormationSanitaire, Role, User
 from catalogue.models import Produit
 from commandes import services as commande_services
+from commandes.models import Commande
 from notifications.models import SMSLog, WhatsAppLog
 
 from . import services
-from .models import MethodePaiement, ReglementPaiement, StatutPaiement
+from .models import EtatPaiement, MethodePaiement, Paiement, ReglementPaiement, StatutPaiement
 
 
 @override_settings(WHATSAPP_BACKEND="log", SMS_BACKEND="log", PAYMENT_GATEWAY="mock")
@@ -172,3 +173,58 @@ class DateDeReglementTests(TestCase):
 
         self.assertIn("Payé le", page)
         self.assertIn("Saisi le", page)
+
+
+@override_settings(WHATSAPP_BACKEND="log", SMS_BACKEND="log", PAYMENT_GATEWAY="mock")
+class VersementsEnFrancsEntiersTests(TestCase):
+    """Le total d'une commande est un nombre entier de FCFA : les versements aussi,
+    sinon le montant payé et le solde retrouvent des centimes."""
+
+    def setUp(self):
+        self.compta = User.objects.create_user(
+            username="compta-arrondi", password="x", role=Role.PERSONNEL_COMPTABILITE
+        )
+        fosa_user = User.objects.create_user(username="csi-arrondi", password="x", role=Role.FORMATION_SANITAIRE)
+        formation = FormationSanitaire.objects.create(user=fosa_user, nom="CSI Arrondi")
+        produit = Produit.objects.create(
+            code_sage="MED-DEC", nom="Produit Décimal", prix_unitaire=Decimal("171.81"), stock_disponible=100
+        )
+        commande = commande_services.get_panier(formation)
+        commande_services.ajouter_produit(commande, produit, 10)  # 1 718,10 -> total 1 718
+        commande_services.confirmer_commande(commande)
+        self.commande = commande
+
+    def test_la_commande_se_solde_avec_le_montant_affiche(self):
+        services.mettre_a_jour_paiement(self.commande, "1718", self.compta)
+
+        commande = Commande.objects.get(pk=self.commande.pk)
+        self.assertEqual(commande.etat_paiement, EtatPaiement.PAYEE)
+        self.assertEqual(commande.solde_restant, Decimal("0"))
+
+    def test_un_versement_a_decimales_est_refuse(self):
+        with self.assertRaises(ValueError) as erreur:
+            services.mettre_a_jour_paiement(self.commande, "1000,50", self.compta)
+
+        self.assertIn("entier", str(erreur.exception))
+        self.assertEqual(ReglementPaiement.objects.count(), 0)
+
+    def test_un_ancien_reglement_a_centimes_ne_laisse_pas_la_commande_partielle(self):
+        """Avant l'arrondi des totaux, une commande de 1 718,60 se soldait en saisissant
+        1 718,60. Son total vaut désormais 1 719 : les 40 centimes d'écart ne sont pas
+        encaissables et ne doivent pas la faire repasser « partiellement payée »."""
+        Commande.objects.filter(pk=self.commande.pk).update(montant_total=Decimal("1719"))
+        Paiement.objects.create(
+            commande=self.commande, montant=Decimal("1719"), montant_paye=Decimal("1718.60")
+        )
+
+        commande = Commande.objects.get(pk=self.commande.pk)
+        self.assertEqual(commande.etat_paiement, EtatPaiement.PAYEE)
+        self.assertEqual(commande.solde_restant, Decimal("0"))
+
+    def test_le_formulaire_n_accepte_que_des_francs_entiers(self):
+        self.client.force_login(self.compta)
+
+        page = self.client.get(reverse("paiements:modifier_paiement", args=[self.commande.pk])).content.decode()
+
+        self.assertIn('step="1"', page)
+        self.assertIn('max="1718.00"', page)

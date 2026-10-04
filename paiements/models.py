@@ -56,7 +56,7 @@ class Paiement(models.Model):
     def etat(self):
         if self.montant_paye <= 0:
             return EtatPaiement.NON_PAYEE
-        if self.montant_paye < self.commande.montant_total:
+        if self.commande.solde_restant > 0:
             return EtatPaiement.PARTIELLE
         return EtatPaiement.PAYEE
 

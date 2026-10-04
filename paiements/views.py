@@ -21,6 +21,7 @@ from accounts.decorators import (
     personnel_frps_required,
 )
 from commandes.models import Commande, StatutCommande
+from frps_project.formatage import formater_montant
 
 from . import services
 from .models import MethodePaiement, Paiement
@@ -131,7 +132,7 @@ def modifier_paiement(request, commande_id):
                 methode=request.POST.get("methode", MethodePaiement.ESPECES),
                 date_paiement=request.POST.get("date_paiement"),
             )
-            messages.success(request, f"Versement enregistré : {montant_verse} FCFA reçus.")
+            messages.success(request, f"Versement enregistré : {formater_montant(montant_verse)} FCFA reçus.")
             return redirect("paiements:gerer_paiements")
         except ValueError as exc:
             messages.error(request, str(exc))
