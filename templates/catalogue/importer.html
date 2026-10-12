@@ -4,12 +4,13 @@
 <h1 class="h4 mb-3">Importer les produits (stock / prix)</h1>
 <p class="text-muted">
     Charge un fichier Excel (.xlsx) pour actualiser le stock disponible et le prix
-    unitaire des produits déjà présents dans le catalogue. Le fichier doit contenir
-    une colonne code produit (ex. <code>code_sage</code>), une colonne prix
-    (ex. <code>prix_unitaire</code>) et une colonne stock (ex. <code>stock_disponible</code>) —
-    l'ordre des colonnes n'a pas d'importance, seuls les en-têtes comptent.
-    Seuls le stock et le prix sont modifiés : le nom, l'unité et le magasin des
-    produits ne sont pas touchés, et aucun nouveau produit n'est créé.
+    unitaire des produits du catalogue. Le fichier doit contenir une colonne code
+    produit (ex. <code>code_sage</code>), une colonne prix (ex. <code>prix_unitaire</code>)
+    et une colonne stock (ex. <code>stock_disponible</code>) — l'ordre des colonnes n'a
+    pas d'importance, seuls les en-têtes comptent. Si une colonne <code>nom</code> est
+    présente, elle est utilisée pour nommer les nouveaux produits. Les produits absents
+    du catalogue sont créés automatiquement (magasin principal, actif, sans rayon) ;
+    les produits existants n'ont que leur stock et leur prix mis à jour.
 </p>
 
 <form method="post" enctype="multipart/form-data" class="row g-2 align-items-end mb-4">
@@ -24,7 +25,7 @@
 </form>
 
 {% if resultats %}
-<div class="row row-cols-2 row-cols-md-3 g-3 mb-4">
+<div class="row row-cols-2 row-cols-md-4 g-3 mb-4">
     <div class="col">
         <div class="border rounded-3 p-3 text-center">
             <div class="text-muted small">Lignes lues</div>
@@ -39,14 +40,14 @@
     </div>
     <div class="col">
         <div class="border rounded-3 p-3 text-center">
-            <div class="text-muted small">Inchangés</div>
-            <div class="fs-3 fw-bold">{{ resultats.nb_inchanges }}</div>
+            <div class="text-muted small">Créés</div>
+            <div class="fs-3 fw-bold text-primary">{{ resultats.nb_crees }}</div>
         </div>
     </div>
     <div class="col">
         <div class="border rounded-3 p-3 text-center">
-            <div class="text-muted small">Introuvables</div>
-            <div class="fs-3 fw-bold text-danger">{{ resultats.nb_introuvables }}</div>
+            <div class="text-muted small">Inchangés</div>
+            <div class="fs-3 fw-bold">{{ resultats.nb_inchanges }}</div>
         </div>
     </div>
 </div>
@@ -72,23 +73,27 @@
 </div>
 {% endif %}
 
-{% if resultats.introuvables %}
-<h2 class="h6">Codes introuvables dans le catalogue</h2>
+{% if resultats.crees %}
+<h2 class="h6">Nouveaux produits créés</h2>
 <p class="text-muted small">
-    Ces codes du fichier ne correspondent à aucun produit existant — ils ont été ignorés
-    (aucun produit n'est créé automatiquement).
+    Ces produits n'existaient pas dans le catalogue — ils ont été créés automatiquement
+    (magasin principal, actif, sans rayon). Vous pouvez les affiner dans l'admin.
 </p>
 <div class="table-responsive mb-4">
 <table class="table table-striped">
-    <thead><tr><th>Code</th></tr></thead>
+    <thead><tr><th>Produit</th><th>Prix</th><th>Stock</th></tr></thead>
     <tbody>
-        {% for code in resultats.introuvables|slice:":100" %}
-        <tr><td>{{ code }}</td></tr>
+        {% for p in resultats.crees|slice:":300" %}
+        <tr>
+            <td>{{ p.nom }} <span class="text-muted small">({{ p.code_sage }})</span></td>
+            <td>{{ p.prix }}</td>
+            <td>{{ p.stock }}</td>
+        </tr>
         {% endfor %}
     </tbody>
 </table>
-{% if resultats.nb_introuvables > 100 %}
-<p class="text-muted small">Et {{ resultats.nb_introuvables|add:"-100" }} autres codes introuvables.</p>
+{% if resultats.nb_crees > 300 %}
+<p class="text-muted small">Et {{ resultats.nb_crees|add:"-300" }} autres produits créés.</p>
 {% endif %}
 </div>
 {% endif %}

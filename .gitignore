@@ -1,8 +1,9 @@
 venv/
 __pycache__/
 *.pyc
-db.sqlite3
-db_local_test.sqlite3
+# Toute base SQLite locale : bases de test, copies de travail, sauvegardes.
+# Motif general plutot que des noms precis, pour qu'une copie ne parte jamais dans Git.
+*.sqlite3
 .env
 staticfiles/
 deploy/bin/

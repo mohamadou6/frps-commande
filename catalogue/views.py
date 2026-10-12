@@ -85,8 +85,9 @@ def _decimal(valeur):
 def _lire_fichier_produits(fichier):
     """Lit un classeur Excel dont l'en-tête contient une colonne code produit
     (ex. code_sage), une colonne prix (ex. prix_unitaire) et une colonne stock
-    (ex. stock_disponible), dans n'importe quel ordre. Retourne un dict
-    {code_sage: (prix, stock)}. Lève ValueError si l'en-tête attendu est introuvable."""
+    (ex. stock_disponible), dans n'importe quel ordre. La colonne nom est lue
+    si présente. Retourne un dict {code_sage: {"nom": str|None, "prix": Decimal,
+    "stock": int}}. Lève ValueError si l'en-tête attendu est introuvable."""
     classeur = load_workbook(filename=fichier, data_only=True, read_only=True)
     feuille = classeur.active
     lignes = feuille.iter_rows(values_only=True)
@@ -100,6 +101,8 @@ def _lire_fichier_produits(fichier):
         cle = _normaliser_entete(entete)
         if "code" in cle and "code_sage" not in colonnes:
             colonnes["code_sage"] = index
+        elif "nom" in cle and "nom" not in colonnes:
+            colonnes["nom"] = index
         elif "prix" in cle and "prix_unitaire" not in colonnes:
             colonnes["prix_unitaire"] = index
         elif "stock" in cle and "stock_disponible" not in colonnes:
@@ -123,9 +126,14 @@ def _lire_fichier_produits(fichier):
         if code_sage is None or not str(code_sage).strip():
             continue
         code_sage = str(code_sage).strip()
+        nom = None
+        if "nom" in colonnes:
+            val_nom = ligne[colonnes["nom"]] if colonnes["nom"] < len(ligne) else None
+            if val_nom is not None:
+                nom = str(val_nom).strip() or None
         prix = _decimal(ligne[colonnes["prix_unitaire"]])
         stock = int(_decimal(ligne[colonnes["stock_disponible"]]))
-        updates[code_sage] = (prix, stock)
+        updates[code_sage] = {"nom": nom, "prix": prix, "stock": stock}
     return updates
 
 
@@ -148,14 +156,24 @@ def importer_produits(request):
                 produits = {p.code_sage: p for p in Produit.objects.filter(code_sage__in=updates.keys())}
 
                 modifies = []
-                introuvables = []
+                crees = []
                 nb_inchanges = 0
                 a_sauvegarder = []
+                a_creer = []
 
-                for code_sage, (prix, stock) in updates.items():
+                for code_sage, donnees in updates.items():
+                    prix = donnees["prix"]
+                    stock = donnees["stock"]
+                    nom = donnees["nom"] or code_sage
                     produit = produits.get(code_sage)
                     if produit is None:
-                        introuvables.append(code_sage)
+                        a_creer.append(Produit(
+                            code_sage=code_sage,
+                            nom=nom,
+                            prix_unitaire=prix,
+                            stock_disponible=stock,
+                        ))
+                        crees.append({"code_sage": code_sage, "nom": nom, "prix": prix, "stock": stock})
                         continue
                     if produit.prix_unitaire == prix and produit.stock_disponible == stock:
                         nb_inchanges += 1
@@ -176,18 +194,25 @@ def importer_produits(request):
 
                 if a_sauvegarder:
                     Produit.objects.bulk_update(a_sauvegarder, ["prix_unitaire", "stock_disponible"], batch_size=200)
+                if a_creer:
+                    Produit.objects.bulk_create(a_creer, batch_size=200)
 
                 resultats = {
                     "total_lignes": len(updates),
                     "modifies": modifies,
                     "nb_modifies": len(modifies),
                     "nb_inchanges": nb_inchanges,
-                    "introuvables": introuvables,
-                    "nb_introuvables": len(introuvables),
+                    "crees": crees,
+                    "nb_crees": len(crees),
                 }
 
+                msgs = []
                 if modifies:
-                    messages.success(request, f"{len(modifies)} produits mis à jour.")
+                    msgs.append(f"{len(modifies)} produit(s) mis à jour")
+                if crees:
+                    msgs.append(f"{len(crees)} nouveau(x) produit(s) créé(s)")
+                if msgs:
+                    messages.success(request, " · ".join(msgs) + ".")
                 else:
                     messages.info(request, "Aucun changement détecté dans ce fichier.")
 
