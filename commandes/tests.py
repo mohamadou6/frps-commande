@@ -1,19 +1,22 @@
 import contextlib
 import importlib
 import io
+import json
+import uuid
 from decimal import Decimal
 
 from django.apps import apps as django_apps
+from django.core import mail
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from accounts.models import FormationSanitaire, Role, User
 from catalogue.models import Produit
-from frps_project.formatage import formater_montant
+from frps_project.formatage import formater_montant, formater_prix
 from notifications.models import SMSLog
 
 from . import services
-from .models import Commande, StatutCommande
+from .models import Commande, LigneCommande, StatutCommande
 
 
 @override_settings(SMS_BACKEND="log", WHATSAPP_BACKEND="log")
@@ -295,3 +298,277 @@ class AjoutAuPanierSansRechargementTests(TestCase):
 
         self.assertIn("data-ajout-instantane", page)
         self.assertIn("form-ajout", page)
+
+    def test_les_fiches_portent_le_produit_pour_l_ajout_sans_reseau(self):
+        """js/app.js lit ces valeurs pour garder le produit sur le téléphone : le prix
+        doit rester lisible par JavaScript (point décimal, sans séparateur de milliers)."""
+        page = self.client.get(reverse("catalogue:liste")).content.decode()
+
+        self.assertIn(f'data-produit-id="{self.produit.pk}"', page)
+        self.assertIn('data-produit-prix="1250.50"', page)
+        self.assertIn('data-produit-stock="10"', page)
+
+
+@override_settings(SMS_BACKEND="log", WHATSAPP_BACKEND="log")
+class CommandeHorsConnexionTests(TestCase):
+    """Commande préparée sans réseau sur le téléphone (js/demandes.js), envoyée au retour
+    du réseau, validée par le serveur à son arrivée. Trois risques : un renvoi qui
+    double la commande et le débit, un stock qui a baissé entre-temps, un prix repris
+    du téléphone."""
+
+    def setUp(self):
+        self.stock_user = User.objects.create_user(
+            username="stock", password="x", role=Role.PERSONNEL_STOCK,
+            telephone="+237600000001", email="stock@frpsno.com",
+        )
+        self.fosa_user = User.objects.create_user(username="csi1", password="x", role=Role.FORMATION_SANITAIRE)
+        self.formation = FormationSanitaire.objects.create(user=self.fosa_user, nom="CSI Test")
+        self.paracetamol = Produit.objects.create(
+            code_sage="MED-P", nom="Paracetamol", prix_unitaire=Decimal("100.50"), stock_disponible=50
+        )
+        self.amoxicilline = Produit.objects.create(
+            code_sage="MED-A", nom="Amoxicilline", prix_unitaire=Decimal("200"), stock_disponible=4
+        )
+        self.client.force_login(self.fosa_user)
+
+    def _envoyer(self, lignes, uuid_client=None, **champs):
+        corps = {"uuid": str(uuid_client or uuid.uuid4()), "compte": str(self.fosa_user.pk), "lignes": lignes}
+        corps.update(champs)
+        return self.client.post(
+            reverse("commandes:synchroniser_demande"), data=json.dumps(corps), content_type="application/json"
+        )
+
+    def _stock(self, produit):
+        produit.refresh_from_db()
+        return produit.stock_disponible
+
+    def test_la_demande_est_validee_a_son_arrivee(self):
+        reponse = self._envoyer([{"produit": self.paracetamol.pk, "quantite": 10}])
+
+        self.assertEqual(reponse.status_code, 200)
+        donnees = reponse.json()
+        commande = Commande.objects.get(pk=donnees["commande_id"])
+        self.assertEqual(commande.statut, StatutCommande.CONFIRMEE)
+        self.assertIsNotNone(commande.date_confirmation)
+        self.assertEqual(commande.montant_total, Decimal("1005"))
+        self.assertEqual(self._stock(self.paracetamol), 40)
+        self.assertEqual(donnees["lignes"], [
+            {"produit": self.paracetamol.pk, "nom": "Paracetamol", "demandee": 10, "servie": 10,
+             "prix_unitaire": formater_prix(Decimal("100.50"))},
+        ])
+        self.assertEqual(donnees["montant_total"], formater_montant(Decimal("1005")))
+        self.assertFalse(donnees["deja_recue"])
+        # Notifiée comme une commande passée en ligne.
+        self.assertTrue(SMSLog.objects.filter(destinataire="+237600000001", commande=commande).exists())
+
+    def test_un_renvoi_de_la_meme_demande_ne_cree_ni_doublon_ni_second_debit(self):
+        """Réponse perdue (réseau coupé pendant l'envoi), ou envoi doublé par le service
+        worker et la page au retour du réseau : le téléphone renvoie la même demande."""
+        identifiant = uuid.uuid4()
+        lignes = [{"produit": self.paracetamol.pk, "quantite": 10}]
+
+        premiere = self._envoyer(lignes, uuid_client=identifiant).json()
+        seconde = self._envoyer(lignes, uuid_client=identifiant).json()
+
+        self.assertEqual(Commande.objects.filter(formation_sanitaire=self.formation).count(), 1)
+        self.assertEqual(seconde["commande_id"], premiere["commande_id"])
+        self.assertTrue(seconde["deja_recue"])
+        self.assertEqual(self._stock(self.paracetamol), 40)  # débité une seule fois
+        self.assertEqual(SMSLog.objects.count(), 1)  # notifiée une seule fois
+
+    def test_stock_insuffisant_a_l_arrivee_sert_ce_qui_reste(self):
+        """Le stock a baissé entre la préparation hors ligne et l'arrivée : on sert ce
+        qui reste plutôt que de refuser toute la commande."""
+        donnees = self._envoyer([
+            {"produit": self.paracetamol.pk, "quantite": 2},
+            {"produit": self.amoxicilline.pk, "quantite": 10},
+        ]).json()
+
+        commande = Commande.objects.get(pk=donnees["commande_id"])
+        self.assertEqual(commande.statut, StatutCommande.CONFIRMEE)
+        amox = commande.lignes.get(produit=self.amoxicilline)
+        self.assertEqual((amox.quantite_demandee, amox.quantite), (10, 4))
+        self.assertTrue(amox.servie_en_partie)
+        self.assertEqual(self._stock(self.amoxicilline), 0)
+        self.assertEqual(self._stock(self.paracetamol), 48)
+        self.assertEqual(commande.montant_total, Decimal("1001"))  # 2 × 100,50 + 4 × 200
+
+    def test_rien_de_disponible_annule_la_demande_sans_debit_ni_notification(self):
+        Produit.objects.filter(pk=self.amoxicilline.pk).update(stock_disponible=0)
+
+        donnees = self._envoyer([{"produit": self.amoxicilline.pk, "quantite": 3}]).json()
+
+        commande = Commande.objects.get(pk=donnees["commande_id"])
+        self.assertEqual(commande.statut, StatutCommande.ANNULEE)
+        self.assertEqual(commande.montant_total, Decimal("0"))
+        self.assertEqual(donnees["lignes"][0]["servie"], 0)
+        self.assertEqual(self._stock(self.amoxicilline), 0)
+        self.assertFalse(SMSLog.objects.exists())
+
+    def test_le_prix_est_recalcule_au_serveur(self):
+        """Le téléphone a vu un autre prix (catalogue enregistré), ou en envoie un faux :
+        seul le prix du serveur au moment de la validation compte."""
+        Produit.objects.filter(pk=self.paracetamol.pk).update(prix_unitaire=Decimal("150"))
+
+        donnees = self._envoyer(
+            [{"produit": self.paracetamol.pk, "quantite": 2, "prix": "1", "prix_unitaire": "1"}],
+            montant_total="2",
+        ).json()
+
+        ligne = LigneCommande.objects.get(commande_id=donnees["commande_id"])
+        self.assertEqual(ligne.prix_unitaire_snapshot, Decimal("150"))
+        self.assertEqual(Commande.objects.get(pk=donnees["commande_id"]).montant_total, Decimal("300"))
+
+    def test_un_produit_desactive_entre_temps_n_est_pas_servi(self):
+        Produit.objects.filter(pk=self.amoxicilline.pk).update(actif=False)
+
+        donnees = self._envoyer([
+            {"produit": self.paracetamol.pk, "quantite": 1},
+            {"produit": self.amoxicilline.pk, "quantite": 1},
+        ]).json()
+
+        servies = {ligne["produit"]: ligne["servie"] for ligne in donnees["lignes"]}
+        self.assertEqual(servies, {self.paracetamol.pk: 1, self.amoxicilline.pk: 0})
+        self.assertEqual(self._stock(self.amoxicilline), 4)
+
+    def test_un_produit_supprime_du_catalogue_est_ignore(self):
+        donnees = self._envoyer([
+            {"produit": self.paracetamol.pk, "quantite": 1},
+            {"produit": 999999, "quantite": 1},
+        ]).json()
+
+        self.assertEqual([ligne["produit"] for ligne in donnees["lignes"]], [self.paracetamol.pk])
+
+    def test_le_meme_produit_en_double_est_additionne(self):
+        donnees = self._envoyer([
+            {"produit": self.paracetamol.pk, "quantite": 2},
+            {"produit": self.paracetamol.pk, "quantite": 3},
+        ]).json()
+
+        self.assertEqual(donnees["lignes"][0]["demandee"], 5)
+
+    def test_une_demande_restee_en_attente_est_terminee_au_renvoi(self):
+        """Reçue mais pas validée (erreur entre les deux) : elle reste « en attente de
+        validation », sans débit, et le renvoi automatique du téléphone la termine."""
+        identifiant = uuid.uuid4()
+        commande, _ = services.recevoir_demande(self.formation, identifiant, {self.paracetamol.pk: 5})
+        self.assertEqual(commande.statut, StatutCommande.EN_ATTENTE_SYNCHRO)
+        self.assertEqual(self._stock(self.paracetamol), 50)
+
+        donnees = self._envoyer([{"produit": self.paracetamol.pk, "quantite": 5}], uuid_client=identifiant).json()
+
+        self.assertEqual(donnees["commande_id"], commande.pk)
+        self.assertEqual(donnees["statut"], StatutCommande.CONFIRMEE)
+        self.assertEqual(self._stock(self.paracetamol), 45)
+
+    def test_une_demande_en_attente_ne_compte_pas_comme_commande_effective(self):
+        commande, _ = services.recevoir_demande(self.formation, uuid.uuid4(), {self.paracetamol.pk: 5})
+
+        self.assertFalse(commande.est_effective)
+        page = self.client.get(reverse("commandes:detail", args=[commande.pk])).content.decode()
+        self.assertNotIn("Télécharger le PDF", page)
+        self.assertIn("en cours de validation", page)
+
+    def test_l_identifiant_d_une_autre_fosa_est_refuse_sans_rien_reveler(self):
+        autre_user = User.objects.create_user(username="csi2", password="x", role=Role.FORMATION_SANITAIRE)
+        autre = FormationSanitaire.objects.create(user=autre_user, nom="Autre FOSA")
+        identifiant = uuid.uuid4()
+        commande_autre, _ = services.synchroniser_demande(autre, identifiant, {self.paracetamol.pk: 1})
+
+        reponse = self._envoyer([{"produit": self.paracetamol.pk, "quantite": 7}], uuid_client=identifiant)
+
+        self.assertEqual(reponse.status_code, 400)
+        self.assertNotIn("Autre FOSA", reponse.content.decode())
+        self.assertFalse(Commande.objects.filter(formation_sanitaire=self.formation).exists())
+        self.assertEqual(commande_autre.lignes.get().quantite_demandee, 1)
+
+    def test_une_demande_preparee_sous_un_autre_compte_n_est_pas_traitee(self):
+        """Téléphone partagé : la demande d'un compte ne part jamais sous la session d'un autre."""
+        reponse = self._envoyer([{"produit": self.paracetamol.pk, "quantite": 1}], compte="123456")
+
+        self.assertEqual(reponse.status_code, 409)
+        self.assertEqual(reponse.json()["code"], "autre_compte")
+        self.assertFalse(Commande.objects.exists())
+
+    def test_une_demande_illisible_est_refusee_sans_rien_creer(self):
+        url = reverse("commandes:synchroniser_demande")
+        envois = [
+            json.dumps({"uuid": "pas-un-uuid", "lignes": [{"produit": self.paracetamol.pk, "quantite": 1}]}),
+            json.dumps({"uuid": str(uuid.uuid4()), "lignes": []}),
+            json.dumps({"uuid": str(uuid.uuid4()), "lignes": [{"produit": self.paracetamol.pk, "quantite": -1}]}),
+            json.dumps({"uuid": str(uuid.uuid4()), "lignes": [{"produit": "x", "quantite": 1}]}),
+            json.dumps([1, 2]),
+            "pas du json",
+        ]
+        for corps in envois:
+            with self.subTest(corps=corps):
+                reponse = self.client.post(url, data=corps, content_type="application/json")
+                self.assertEqual(reponse.status_code, 400)
+        self.assertFalse(Commande.objects.exists())
+
+    def test_un_simple_GET_ne_cree_rien(self):
+        reponse = self.client.get(reverse("commandes:synchroniser_demande"))
+
+        self.assertEqual(reponse.status_code, 405)
+
+    def test_le_personnel_frps_ne_peut_pas_envoyer_de_demande(self):
+        self.client.force_login(self.stock_user)
+
+        reponse = self._envoyer([{"produit": self.paracetamol.pk, "quantite": 1}], compte=str(self.stock_user.pk))
+
+        self.assertEqual(reponse.status_code, 302)
+        self.assertFalse(Commande.objects.exists())
+
+    def test_sans_session_la_demande_n_est_pas_traitee(self):
+        """Le téléphone reçoit la page de connexion (pas du JSON) et garde sa demande."""
+        self.client.logout()
+
+        reponse = self._envoyer([{"produit": self.paracetamol.pk, "quantite": 1}])
+
+        self.assertEqual(reponse.status_code, 302)
+        self.assertIn(reverse("login"), reponse["Location"])
+        self.assertFalse(Commande.objects.exists())
+
+    def test_le_detail_montre_le_demande_et_le_servi(self):
+        donnees = self._envoyer([{"produit": self.amoxicilline.pk, "quantite": 10}]).json()
+
+        page = self.client.get(reverse("commandes:detail", args=[donnees["commande_id"]])).content.decode()
+
+        self.assertIn("<th>Demandé</th><th>Servi</th>", page)
+        self.assertIn("préparée hors connexion", page)
+        self.assertIn('class="quantite-reduite"', page)
+
+    def test_l_historique_signale_la_commande_preparee_hors_connexion(self):
+        self._envoyer([{"produit": self.paracetamol.pk, "quantite": 1}])
+
+        page = self.client.get(reverse("commandes:historique")).content.decode()
+
+        self.assertIn("📡 hors connexion", page)
+
+    def test_les_lignes_non_servies_restent_hors_du_sms_et_de_l_email(self):
+        Produit.objects.filter(pk=self.amoxicilline.pk).update(stock_disponible=0)
+
+        donnees = self._envoyer([
+            {"produit": self.paracetamol.pk, "quantite": 1},
+            {"produit": self.amoxicilline.pk, "quantite": 3},
+        ]).json()
+
+        commande = Commande.objects.get(pk=donnees["commande_id"])
+        self.assertEqual(commande.lignes.count(), 2)  # la FOSA voit le produit non servi
+        self.assertEqual(list(commande.lignes.servies().values_list("produit", flat=True)), [self.paracetamol.pk])
+        sms = SMSLog.objects.get(commande=commande)
+        self.assertNotIn("Amoxicilline", sms.message)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertNotIn("Amoxicilline", mail.outbox[0].body)
+
+    def test_une_commande_en_ligne_garde_son_affichage(self):
+        """Les colonnes Demandé/Servi ne concernent que les commandes hors connexion."""
+        commande = services.get_panier(self.formation)
+        services.ajouter_produit(commande, self.paracetamol, 2)
+        services.confirmer_commande(commande)
+
+        page = self.client.get(reverse("commandes:detail", args=[commande.pk])).content.decode()
+
+        self.assertIn("<th>Quantité</th>", page)
+        self.assertNotIn("Demandé", page)
+        self.assertIn("Télécharger le PDF", page)

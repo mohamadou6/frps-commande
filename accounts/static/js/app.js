@@ -120,6 +120,10 @@
 
     window.frpsToast = afficherToast;
 
+    // Commande préparée hors connexion (bloc plus bas) : renseigné seulement si le
+    // téléphone sait garder une commande (compte FOSA, IndexedDB disponible).
+    var commandeHorsLigne = null;
+
     // ---------- Envoi sans réseau ----------
     // Un formulaire envoyé sans réseau menait à une page d'erreur du navigateur,
     // puis à « Pas de connexion », et la saisie était perdue. Quand le téléphone se
@@ -130,6 +134,8 @@
         if (navigator.onLine !== false) return;
         var formulaire = evenement.target;
         if ((formulaire.getAttribute("method") || "get").toLowerCase() !== "post") return;
+        // L'ajout au panier du catalogue, lui, part dans la commande hors connexion.
+        if (commandeHorsLigne && formulaire.classList.contains("form-ajout")) return;
         evenement.preventDefault();
         evenement.stopImmediatePropagation();
         afficherToast("Pas de réseau : rien n'a été envoyé. Vos saisies sont conservées, réessayez quand le réseau revient.", "warning");
@@ -371,6 +377,406 @@
         });
     })();
 
+    // ---------- Commande préparée hors connexion ----------
+    // Sans réseau, « Ajouter » au catalogue garde le produit sur le téléphone
+    // (js/demandes.js). La FOSA envoie ensuite sa commande comme d'habitude : elle
+    // part toute seule dès que le réseau revient (Background Sync, sinon à l'ouverture
+    // d'une page ou au retour du réseau), et le serveur la valide à son arrivée avec le
+    // stock et les prix de ce moment-là. Le panneau, dans base.html, montre à chaque
+    // étape où en est la commande, puis ce qui a été demandé et servi.
+    (function () {
+        var conteneur = document.getElementById("commande-hors-ligne");
+        var D = window.FrpsDemandes;
+        if (!conteneur || !D || !D.disponible() || !window.Promise || !window.fetch) return;
+
+        var compte = conteneur.getAttribute("data-compte");
+        var urlEnvoi = conteneur.getAttribute("data-url-envoi");
+        var syncPossible = !!(navigator.serviceWorker && window.SyncManager);
+        var demandes = [];
+        var envoiEnCours = false;
+        var reseauInsuffisant = false; // dernier envoi coupé par le réseau
+        var brouillonOuvert = false;
+        // Un ajout en ligne coupé par le réseau alors que le téléphone se croit connecté
+        // (réseau présent mais sans données, fréquent) : pendant une minute, le toucher
+        // suivant garde le produit sur le téléphone au lieu d'échouer encore.
+        var coupureLe = 0;
+        var DUREE_COUPURE_MS = 60000;
+
+        function jeton() {
+            // Le cookie d'abord : Django change le jeton à chaque connexion, et une page
+            // resservie depuis le cache porte celui de son enregistrement.
+            var morceau = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/);
+            return morceau ? decodeURIComponent(morceau[1]) : conteneur.getAttribute("data-jeton");
+        }
+
+        function brouillon() {
+            return demandes.filter(function (d) { return d.etat === "brouillon"; })[0] || null;
+        }
+
+        function enAttente() {
+            return demandes.filter(function (d) { return d.etat === "en_attente"; });
+        }
+
+        function nombre(valeur, decimales) {
+            return Number(valeur).toLocaleString("fr-FR", {minimumFractionDigits: decimales, maximumFractionDigits: decimales});
+        }
+
+        function estimation(lignes) {
+            var total = lignes.reduce(function (somme, l) { return somme + l.prix * l.quantite; }, 0);
+            return nombre(Math.round(total), 0) + " FCFA";
+        }
+
+        function produits(n) {
+            return n + " produit" + (n > 1 ? "s" : "");
+        }
+
+        function dateCourte(iso) {
+            var date = iso ? new Date(iso) : null;
+            if (!date || isNaN(date.getTime())) return "";
+            return date.toLocaleDateString("fr-FR", {day: "2-digit", month: "2-digit"}) +
+                " à " + date.toLocaleTimeString("fr-FR", {hour: "2-digit", minute: "2-digit"});
+        }
+
+        function el(balise, classe, texte) {
+            var element = document.createElement(balise);
+            if (classe) element.className = classe;
+            if (texte !== undefined) element.textContent = texte;
+            return element;
+        }
+
+        function bouton(texte, classe, action, uuid) {
+            var b = el("button", "btn btn-sm " + classe, texte);
+            b.type = "button";
+            b.setAttribute("data-action", action);
+            if (uuid) b.setAttribute("data-uuid", uuid);
+            return b;
+        }
+
+        function tableau(entetes, rangees) {
+            var enveloppe = el("div", "table-responsive my-2");
+            var table = el("table", "table table-sm align-middle mb-0");
+            var tete = el("tr");
+            entetes.forEach(function (titre) { tete.appendChild(el("th", "", titre)); });
+            table.appendChild(el("thead")).appendChild(tete);
+            var corps = table.appendChild(el("tbody"));
+            rangees.forEach(function (cellules) {
+                var rangee = corps.appendChild(el("tr"));
+                cellules.forEach(function (cellule) {
+                    var td = rangee.appendChild(el("td"));
+                    if (cellule && cellule.nodeType) td.appendChild(cellule);
+                    else td.textContent = cellule;
+                });
+            });
+            enveloppe.appendChild(table);
+            return enveloppe;
+        }
+
+        function carteBrouillon(demande) {
+            var carte = el("details", "app-carte hors-ligne-carte etat-brouillon");
+            carte.open = brouillonOuvert;
+            carte.addEventListener("toggle", function () { brouillonOuvert = carte.open; });
+            var resume = carte.appendChild(el("summary"));
+            resume.appendChild(el("span", "hors-ligne-titre", "📡 Commande préparée sur ce téléphone"));
+            resume.appendChild(el("span", "hors-ligne-resume",
+                produits(demande.lignes.length) + " · environ " + estimation(demande.lignes)));
+            carte.appendChild(el("p", "small text-secondary mb-0",
+                "Prix et stock du catalogue enregistré. Le FRPS les vérifie à l'arrivée de la commande " +
+                "et ne facture que ce qu'il peut servir."));
+            // Trois colonnes seulement (prix sous le nom) : tient sur un téléphone sans
+            // faire défiler le tableau pour atteindre le bouton de retrait.
+            carte.appendChild(tableau(["Produit", "Quantité", ""], demande.lignes.map(function (ligne) {
+                var produit = el("div");
+                produit.appendChild(el("div", "", ligne.nom));
+                produit.appendChild(el("div", "small text-secondary", nombre(ligne.prix, 2) + " FCFA l'unité (indicatif)"));
+                var champ = el("input", "form-control form-control-sm quantite-panier");
+                champ.type = "number";
+                champ.min = "0";
+                if (ligne.stock) champ.max = String(ligne.stock);
+                champ.value = String(ligne.quantite);
+                champ.setAttribute("data-produit", ligne.produit);
+                champ.setAttribute("aria-label", "Quantité pour " + ligne.nom);
+                var retirer = bouton("✕", "btn-outline-danger", "retirer");
+                retirer.setAttribute("data-produit", ligne.produit);
+                retirer.setAttribute("aria-label", "Retirer " + ligne.nom);
+                retirer.title = "Retirer";
+                return [produit, champ, retirer];
+            })));
+            var actions = carte.appendChild(el("div", "d-flex flex-wrap gap-2 align-items-center"));
+            actions.appendChild(bouton("Envoyer la commande", "btn-primary", "valider"));
+            actions.appendChild(bouton("Vider", "btn-link text-secondary", "vider"));
+            actions.appendChild(el("span", "small text-secondary",
+                "Elle partira toute seule dès le retour du réseau."));
+            return carte;
+        }
+
+        function carteEnAttente(demande) {
+            var carte = el("div", "app-carte hors-ligne-carte etat-attente");
+            carte.appendChild(el("div", "hors-ligne-titre", "📤 Commande en attente d'envoi"));
+            carte.appendChild(el("div", "small", "Préparée le " + dateCourte(demande.validee_le || demande.creee_le) +
+                " · " + produits(demande.lignes.length) + " · environ " + estimation(demande.lignes)));
+            var etat;
+            if (envoiEnCours) etat = "Envoi en cours…";
+            else if (demande.blocage === "connexion") etat = "Votre session a expiré : reconnectez-vous, la commande partira ensuite.";
+            else if (navigator.onLine === false) {
+                etat = syncPossible
+                    ? "Elle partira toute seule dès le retour du réseau, même application fermée."
+                    : "Elle partira dès que l'application sera ouverte avec du réseau.";
+            } else if (reseauInsuffisant || demande.blocage) etat = "Pas encore passée (réseau faible ou serveur occupé) : nouvel essai automatique.";
+            else etat = "Elle part dès que le réseau le permet.";
+            carte.appendChild(el("div", "small text-secondary mt-1", etat));
+            var detail = carte.appendChild(el("details", "small mt-1"));
+            detail.appendChild(el("summary", "", "Voir les produits"));
+            var liste = detail.appendChild(el("ul", "mb-1"));
+            demande.lignes.forEach(function (ligne) { liste.appendChild(el("li", "", ligne.nom + " × " + ligne.quantite)); });
+            var actions = carte.appendChild(el("div", "d-flex flex-wrap gap-2 mt-2"));
+            if (!envoiEnCours && navigator.onLine !== false) {
+                actions.appendChild(bouton("Envoyer maintenant", "btn-primary", "envoyer"));
+            }
+            actions.appendChild(bouton("Annuler cette commande", "btn-link text-secondary", "annuler", demande.uuid));
+            return carte;
+        }
+
+        function carteEnvoyee(demande) {
+            var resultat = demande.resultat || {};
+            var servie = resultat.statut !== "annulee";
+            var carte = el("div", "app-carte hors-ligne-carte " + (servie ? "etat-envoyee" : "etat-refusee"));
+            carte.appendChild(el("div", "hors-ligne-titre", servie
+                ? "✅ Commande n° " + resultat.commande_id + " reçue et validée par le FRPS"
+                : "⚠️ Commande reçue, mais rien n'a pu être servi : stock épuisé"));
+            carte.appendChild(el("div", "small", "Envoyée le " + dateCourte(demande.envoyee_le) +
+                (servie ? " · montant final : " + resultat.montant_total + " FCFA" : "")));
+
+            // Ce qui a été servi en moins, et les produits retirés du catalogue entre-temps.
+            var recues = {};
+            (resultat.lignes || []).forEach(function (ligne) { recues[ligne.produit] = ligne; });
+            var ecarts = [];
+            demande.lignes.forEach(function (ligne) {
+                var recue = recues[ligne.produit];
+                if (!recue) ecarts.push([ligne.nom, String(ligne.quantite), "0 (plus au catalogue)"]);
+                else if (recue.servie < recue.demandee) ecarts.push([recue.nom, String(recue.demandee), String(recue.servie)]);
+            });
+            if (ecarts.length && servie) {
+                carte.appendChild(el("div", "small fw-semibold mt-2", "Servi en moins que demandé (stock du jour) :"));
+                carte.appendChild(tableau(["Produit", "Demandé", "Servi"], ecarts));
+            } else if (servie) {
+                carte.appendChild(el("div", "small text-secondary mt-1", "Tout ce que vous aviez demandé a été servi."));
+            }
+            var actions = carte.appendChild(el("div", "d-flex flex-wrap gap-2 mt-2"));
+            if (resultat.url_detail) {
+                var lien = el("a", "btn btn-sm btn-outline-primary", "Voir la commande");
+                lien.href = resultat.url_detail;
+                actions.appendChild(lien);
+            }
+            actions.appendChild(bouton("OK", "btn-primary", "effacer", demande.uuid));
+            return carte;
+        }
+
+        function carteRefusee(demande) {
+            var carte = el("div", "app-carte hors-ligne-carte etat-refusee");
+            carte.appendChild(el("div", "hors-ligne-titre", "⛔ Commande refusée par le serveur"));
+            carte.appendChild(el("div", "small", (demande.message || "") + " Rien n'a été commandé."));
+            var actions = carte.appendChild(el("div", "d-flex flex-wrap gap-2 mt-2"));
+            actions.appendChild(bouton("OK", "btn-primary", "effacer", demande.uuid));
+            return carte;
+        }
+
+        function afficher() {
+            var cartes = [];
+            demandes.forEach(function (d) { if (d.etat === "envoyee") cartes.push(carteEnvoyee(d)); });
+            demandes.forEach(function (d) { if (d.etat === "refusee") cartes.push(carteRefusee(d)); });
+            enAttente().forEach(function (d) { cartes.push(carteEnAttente(d)); });
+            if (brouillon()) cartes.push(carteBrouillon(brouillon()));
+            while (conteneur.firstChild) conteneur.removeChild(conteneur.firstChild);
+            cartes.forEach(function (carte) { conteneur.appendChild(carte); });
+            conteneur.hidden = !cartes.length;
+        }
+
+        // Repère sur les fiches du catalogue, comme « Déjà au panier ».
+        function marquerFiches() {
+            var quantites = {};
+            var b = brouillon();
+            if (b) b.lignes.forEach(function (l) { quantites[l.produit] = l.quantite; });
+            Array.prototype.forEach.call(document.querySelectorAll(".form-ajout[data-produit-id]"), function (formulaire) {
+                var fiche = formulaire.closest(".produit-card");
+                if (!fiche) return;
+                var repere = fiche.querySelector(".produit-hors-ligne");
+                var quantite = quantites[formulaire.getAttribute("data-produit-id")];
+                if (!quantite) {
+                    if (repere) repere.parentNode.removeChild(repere);
+                    return;
+                }
+                if (!repere) {
+                    repere = el("div", "produit-au-panier produit-hors-ligne");
+                    fiche.insertBefore(repere, formulaire);
+                }
+                repere.textContent = "📡 Commande hors connexion : " + quantite;
+            });
+        }
+
+        function recharger() {
+            return D.lister(compte).then(function (liste) {
+                demandes = liste;
+                afficher();
+                marquerFiches();
+                return liste;
+            });
+        }
+
+        function erreurMemoire() {
+            afficherToast("Impossible d'enregistrer sur ce téléphone (mémoire pleine ?). Rien n'a été gardé.", "danger");
+        }
+
+        function programmerSynchro() {
+            if (!syncPossible) return;
+            navigator.serviceWorker.ready.then(function (enregistrement) {
+                return enregistrement.sync.register(D.ETIQUETTE_SYNC);
+            }).catch(function () { /* refusé : la page enverra elle-même */ });
+        }
+
+        function envoyer() {
+            if (envoiEnCours || navigator.onLine === false || !enAttente().length) return;
+            envoiEnCours = true;
+            afficher();
+            D.envoyerEnAttente({url: urlEnvoi, jeton: jeton, compte: compte}).then(function (bilan) {
+                envoiEnCours = false;
+                reseauInsuffisant = bilan.reseau;
+                if (bilan.envoyees || bilan.refusees) coupureLe = 0;
+                // Le service worker est déjà en train d'envoyer : on relit un peu plus tard.
+                if (bilan.occupe) setTimeout(recharger, 5000);
+                return recharger().then(function () {
+                    if (bilan.envoyees) {
+                        afficherToast(bilan.envoyees > 1
+                            ? bilan.envoyees + " commandes préparées hors connexion ont été reçues par le FRPS."
+                            : "Votre commande préparée hors connexion a été reçue par le FRPS.", "success");
+                    }
+                    if (bilan.refusees) afficherToast("Une commande a été refusée par le serveur : détail en haut de la page.", "danger");
+                });
+            }, function () {
+                envoiEnCours = false;
+                afficher();
+            });
+        }
+
+        function ajouter(formulaire) {
+            var fiche = formulaire.closest(".produit-card");
+            var champ = formulaire.querySelector('input[name="quantite"]');
+            var boutonAjout = formulaire.querySelector("button");
+            var quantite = parseInt(champ ? champ.value : "1", 10);
+            var produit = {
+                id: formulaire.getAttribute("data-produit-id"),
+                nom: formulaire.getAttribute("data-produit-nom"),
+                prix: formulaire.getAttribute("data-produit-prix"),
+                stock: formulaire.getAttribute("data-produit-stock"),
+            };
+            if (!(quantite > 0)) {
+                afficherToast("Quantité invalide.", "danger");
+                return;
+            }
+            var erreur = fiche ? fiche.querySelector(".erreur-ajout") : null;
+            if (erreur) erreur.hidden = true;
+            var sansReseau = navigator.onLine === false || Date.now() - coupureLe < DUREE_COUPURE_MS;
+            D.fixerQuantite(compte, produit, quantite).then(recharger).then(function () {
+                afficherToast(sansReseau
+                    ? "Sans réseau : " + produit.nom + " gardé dans la commande préparée sur ce téléphone."
+                    : produit.nom + " ajouté à la commande préparée sur ce téléphone (à envoyer depuis le cadre en haut de page).", "info");
+                if (boutonAjout) {
+                    boutonAjout.textContent = "Gardé ✓";
+                    setTimeout(function () { boutonAjout.textContent = "Ajouter"; }, 1500);
+                }
+            }, erreurMemoire);
+        }
+
+        conteneur.addEventListener("click", function (evenement) {
+            var cible = evenement.target.closest ? evenement.target.closest("[data-action]") : null;
+            if (!cible) return;
+            var action = cible.getAttribute("data-action");
+            var uuid = cible.getAttribute("data-uuid");
+            var suite = null;
+            if (action === "retirer") {
+                suite = D.fixerQuantite(compte, {id: cible.getAttribute("data-produit")}, 0);
+            } else if (action === "vider") {
+                if (!window.confirm("Retirer tous les produits de la commande préparée sur ce téléphone ?")) return;
+                suite = D.viderBrouillon(compte);
+            } else if (action === "valider") {
+                var b = brouillon();
+                if (!b || !window.confirm("Envoyer cette commande de " + produits(b.lignes.length) + " ?\n\n" +
+                    "Elle partira dès que le réseau le permet. Le FRPS la valide à son arrivée, avec le stock " +
+                    "et les prix de ce moment-là : il ne sert et ne facture que ce qui est disponible.")) return;
+                suite = D.validerBrouillon(compte).then(function () {
+                    programmerSynchro();
+                    if (navigator.onLine === false) {
+                        afficherToast("Commande enregistrée sur ce téléphone : elle partira dès le retour du réseau.", "success");
+                    }
+                });
+            } else if (action === "envoyer") {
+                envoyer();
+                return;
+            } else if (action === "annuler") {
+                if (!window.confirm("Annuler cette commande ? Elle ne sera pas envoyée.\n\n" +
+                    "Si elle est déjà partie, elle apparaîtra quand même dans « Mes commandes ».")) return;
+                suite = D.supprimer(uuid);
+            } else if (action === "effacer") {
+                suite = D.supprimer(uuid);
+            }
+            if (suite) {
+                suite.then(recharger).then(function () {
+                    if (action === "valider" && navigator.onLine !== false) envoyer();
+                }, erreurMemoire);
+            }
+        });
+
+        // Correction d'une quantité dans le brouillon.
+        conteneur.addEventListener("change", function (evenement) {
+            var champ = evenement.target;
+            if (!champ.matches || !champ.matches("input[data-produit]")) return;
+            var quantite = parseInt(champ.value, 10) || 0;
+            var max = parseInt(champ.max, 10);
+            if (max && quantite > max) {
+                quantite = max;
+                afficherToast("Quantité ramenée au stock affiché (" + max + ").", "warning");
+            }
+            D.fixerQuantite(compte, {id: champ.getAttribute("data-produit")}, quantite).then(recharger, erreurMemoire);
+        });
+
+        commandeHorsLigne = {
+            // Le produit va dans la commande hors connexion : sans réseau, juste après une
+            // coupure, ou si une commande y est déjà commencée (on ne la coupe pas en deux).
+            prendLaMain: function () {
+                return navigator.onLine === false || !!brouillon() || Date.now() - coupureLe < DUREE_COUPURE_MS;
+            },
+            ajouter: ajouter,
+            signalerCoupure: function () { coupureLe = Date.now(); },
+        };
+
+        // Envoi par la page : à l'ouverture, au retour du réseau, au retour sur
+        // l'application, et toutes les minutes tant qu'une commande attend (réseau
+        // présent mais trop faible pour qu'elle soit passée).
+        recharger().then(function () {
+            if (enAttente().length) {
+                programmerSynchro();
+                if (navigator.onLine !== false) envoyer();
+            }
+        }, function () { /* base illisible : le panneau reste masqué */ });
+        window.addEventListener("online", function () {
+            coupureLe = 0;
+            afficher();
+            envoyer();
+        });
+        window.addEventListener("offline", afficher);
+        document.addEventListener("visibilitychange", function () {
+            if (document.visibilityState === "visible") recharger().then(envoyer);
+        });
+        setInterval(function () {
+            if (document.visibilityState === "visible" && navigator.onLine !== false) envoyer();
+        }, 60000);
+        // Envoi fait par le service worker (Background Sync) pendant que la page est ouverte.
+        if (navigator.serviceWorker) {
+            navigator.serviceWorker.addEventListener("message", function (evenement) {
+                if (evenement.data === "demandes-mises-a-jour") recharger();
+            });
+        }
+    })();
+
     // ---------- Catalogue : ajout au panier sans recharger la page ----------
     // Recharger les 1 200 fiches à chaque produit faisait perdre le rayon, la
     // recherche et la position. Si ce script n'est pas chargé, le formulaire part
@@ -421,6 +827,10 @@
             var formulaire = evenement.target;
             if (!formulaire.classList || !formulaire.classList.contains("form-ajout")) return;
             evenement.preventDefault();
+            if (commandeHorsLigne && commandeHorsLigne.prendLaMain()) {
+                commandeHorsLigne.ajouter(formulaire);
+                return;
+            }
 
             var fiche = formulaire.closest(".produit-card");
             var bouton = formulaire.querySelector("button");
@@ -463,7 +873,16 @@
             }).catch(function () {
                 bouton.disabled = false;
                 bouton.textContent = "Ajouter";
-                afficherErreur(fiche, "Connexion interrompue : produit non ajouté. Réessayez.");
+                if (commandeHorsLigne) {
+                    // Pas d'ajout automatique sur le téléphone : après un délai dépassé, le
+                    // serveur a pu recevoir l'ajout malgré tout, et le produit serait compté
+                    // deux fois. La FOSA décide en touchant à nouveau.
+                    commandeHorsLigne.signalerCoupure();
+                    afficherErreur(fiche, "Connexion interrompue : produit non ajouté. Touchez « Ajouter » à nouveau " +
+                        "pour le garder dans une commande préparée sur ce téléphone.");
+                } else {
+                    afficherErreur(fiche, "Connexion interrompue : produit non ajouté. Réessayez.");
+                }
             }).then(function () {
                 if (minuteur) clearTimeout(minuteur);
             });

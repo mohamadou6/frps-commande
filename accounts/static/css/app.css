@@ -887,6 +887,33 @@ a.card:hover {
     box-shadow: inset 3px 0 0 #0f9d58;
 }
 
+/* ---------- Commande préparée hors connexion (js/app.js) ---------- */
+/* Liseré de couleur selon l'état, lisible d'un coup d'oeil : en préparation (bleu),
+   en attente d'envoi (orange), reçue (vert), refusée ou non servie (rouge). */
+.hors-ligne-carte {
+    display: block;
+    padding: .8rem 1rem;
+    margin-bottom: .6rem;
+    border-left: 5px solid var(--app-texte-bleu);
+}
+.hors-ligne-carte.etat-attente { border-left-color: #d08700; }
+.hors-ligne-carte.etat-envoyee { border-left-color: var(--app-vert); }
+.hors-ligne-carte.etat-refusee { border-left-color: var(--app-texte-rouge); }
+.hors-ligne-carte > summary {
+    cursor: pointer;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: .25rem .75rem;
+}
+.hors-ligne-titre { font-weight: 700; color: var(--app-titre); }
+.hors-ligne-resume { color: var(--app-texte-2); font-size: .9rem; }
+.hors-ligne-carte .table-responsive { box-shadow: none; }
+/* Repère sur la fiche du catalogue, en bleu pour le distinguer du panier en ligne. */
+.produit-au-panier.produit-hors-ligne { color: var(--app-texte-bleu); background: var(--app-teinte-bleu); }
+/* Détail d'une commande : quantité servie inférieure à la demande. */
+.quantite-reduite { color: var(--app-texte-rouge); font-weight: 600; }
+
 /* ---------- Panier ---------- */
 .quantite-panier {
     width: 78px;

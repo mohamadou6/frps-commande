@@ -55,7 +55,7 @@ def par_produit(request):
     if produit_id:
         produit_selectionne = produits.filter(pk=produit_id).first()
         if produit_selectionne:
-            lignes = LigneCommande.objects.filter(
+            lignes = LigneCommande.objects.servies().filter(
                 produit=produit_selectionne,
                 commande__statut__in=COMMANDES_EFFECTIVES,
                 commande__date_confirmation__date__gte=debut,
@@ -122,7 +122,7 @@ def par_fosa(request):
                 LigneCommande.objects.filter(commande__in=commandes).aggregate(total=Sum("quantite"))["total"] or 0
             )
             repartition_produits = (
-                LigneCommande.objects.filter(commande__in=commandes)
+                LigneCommande.objects.servies().filter(commande__in=commandes)
                 .values("produit__nom")
                 .annotate(quantite=Sum("quantite"))
                 .order_by("-quantite")
@@ -225,7 +225,7 @@ def stock(request):
     )["total"] or Decimal("0")
 
     ruptures_qs = (
-        LigneCommande.objects.filter(
+        LigneCommande.objects.servies().filter(
             produit__in=produits_catalogue.filter(stock_disponible=0),
             commande__statut__in=COMMANDES_EFFECTIVES,
             commande__date_confirmation__date__gte=debut,
@@ -237,7 +237,7 @@ def stock(request):
     )
 
     top_commandes_qs = (
-        LigneCommande.objects.filter(
+        LigneCommande.objects.servies().filter(
             produit__in=produits_catalogue,
             commande__statut__in=COMMANDES_EFFECTIVES,
             commande__date_confirmation__date__gte=debut,
@@ -249,7 +249,7 @@ def stock(request):
     )
 
     menace_rupture_qs = (
-        LigneCommande.objects.filter(
+        LigneCommande.objects.servies().filter(
             produit__in=produits_catalogue.filter(stock_disponible__gt=0),
             commande__statut__in=COMMANDES_EFFECTIVES,
             commande__date_confirmation__date__gte=debut,

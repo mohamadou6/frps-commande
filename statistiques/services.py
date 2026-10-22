@@ -22,7 +22,7 @@ def donnees_tableau_de_bord(debut, fin):
     produits_catalogue = Produit.objects.filter(magasin__in=[Magasin.PRINCIPAL, Magasin.UCPC])
     nb_rupture = produits_catalogue.filter(stock_disponible=0).count()
     nb_menace = (
-        LigneCommande.objects.filter(
+        LigneCommande.objects.servies().filter(
             produit__in=produits_catalogue.filter(stock_disponible__gt=0),
             commande__statut__in=COMMANDES_EFFECTIVES,
             commande__date_confirmation__date__gte=debut,
@@ -44,7 +44,7 @@ def donnees_tableau_de_bord(debut, fin):
     )
 
     top_produits_periode = (
-        LigneCommande.objects.filter(
+        LigneCommande.objects.servies().filter(
             commande__statut__in=COMMANDES_EFFECTIVES,
             commande__date_confirmation__date__gte=debut,
             commande__date_confirmation__date__lte=fin,

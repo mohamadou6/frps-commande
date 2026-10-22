@@ -115,7 +115,7 @@ def generer_pdf_commande(commande) -> bytes:
         entete = table.row()
         for titre in ("Produit", "Quantité", "Prix unit.", "Sous-total"):
             entete.cell(titre)
-        for ligne in commande.lignes.select_related("produit"):
+        for ligne in commande.lignes.servies().select_related("produit"):
             rangee = table.row()
             rangee.cell(ligne.produit.nom)
             rangee.cell(str(ligne.quantite))

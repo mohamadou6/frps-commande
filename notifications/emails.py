@@ -40,7 +40,7 @@ def destinataires_personnel_frps():
 
 def _corps_nouvelle_commande(commande):
     formation = commande.formation_sanitaire
-    lignes = list(commande.lignes.select_related("produit"))
+    lignes = list(commande.lignes.servies().select_related("produit"))
 
     localisation = " - ".join(p for p in (formation.district, formation.region) if p)
     entete = [

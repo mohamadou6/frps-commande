@@ -57,7 +57,7 @@ _SMS_SEGMENT_MAX = 155
 
 
 def _construire_message(entete, commande, cloture):
-    lignes = list(commande.lignes.select_related("produit"))
+    lignes = list(commande.lignes.servies().select_related("produit"))
 
     prefixe = _sans_accents(f"{entete} {commande.formation_sanitaire.nom}: ")
     suffixe = _sans_accents(f". Total {formater_montant(commande.montant_total)} FCFA. {cloture}")
@@ -93,7 +93,7 @@ def _formatter_lignes_complet(commande):
     interne à l'application, contrairement au SMS)."""
     return ", ".join(
         f"{ligne.produit.nom} x{ligne.quantite}"
-        for ligne in commande.lignes.select_related("produit")
+        for ligne in commande.lignes.servies().select_related("produit")
     )
 
 

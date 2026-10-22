@@ -10,6 +10,7 @@ urlpatterns = [
     path("modifier-quantite/<int:produit_id>/", views.modifier_quantite, name="modifier_quantite"),
     path("retirer/<int:produit_id>/", views.retirer, name="retirer"),
     path("confirmer/", views.confirmer, name="confirmer"),
+    path("demandes/synchroniser/", views.synchroniser_demande, name="synchroniser_demande"),
     path("historique/", views.historique, name="historique"),
     path("<int:commande_id>/pdf/<str:token>/", views.pdf_commande, name="pdf"),
     path("<int:commande_id>/telecharger/", views.telecharger_pdf, name="telecharger_pdf"),

@@ -3,7 +3,7 @@
 // URL hachées réelles, et ce fichier change dès qu'un fichier statique change —
 // ce qui suffit au navigateur pour détecter une mise à jour.
 
-const VERSION = "v7"; // v5 : charte sortie dans css/app.css et js/app.js ; v6 : bandeaux et relief sur ordinateur ; v7 : ouverture hors ligne, page « Pas de connexion » avec liens
+const VERSION = "v8"; // v5 : charte sortie dans css/app.css et js/app.js ; v6 : bandeaux et relief sur ordinateur ; v7 : ouverture hors ligne, page « Pas de connexion » avec liens ; v8 : commandes préparées hors connexion (js/demandes.js)
 const CACHE_COQUILLE = "frps-coquille-" + VERSION; // ressources fixes de l'app
 const CACHE_PAGES = "frps-pages-" + VERSION; // pages HTML déjà consultées
 const PAGE_HORS_LIGNE = "{% url 'hors_ligne' %}";
@@ -11,6 +11,11 @@ const PREFIXE_STATIC = "{% get_static_prefix %}";
 const VAPID_PUBLIC_KEY = "{{ vapid_public_key }}";
 const URL_ABONNEMENT_PUSH = "{% url 'notifications:abonnement_push' %}";
 const CSRF_TOKEN = "{{ csrf_token }}";
+const URL_DEMANDES = "{% url 'commandes:synchroniser_demande' %}";
+
+// Commandes préparées hors connexion : même code que les pages (stockage IndexedDB et
+// envoi), pour que le service worker puisse les envoyer page fermée.
+importScripts("{% static 'js/demandes.js' %}");
 
 // L'icône de l'écran d'accueil (et l'APK) ouvre « / », qui n'est qu'une redirection :
 // elle n'est donc jamais mise en cache. Sans réseau, on ouvre à la place la page
@@ -29,6 +34,7 @@ const RESSOURCES_COQUILLE = [
     "{% static 'vendor/bootstrap/bootstrap.bundle.min.js' %}",
     "{% static 'css/app.css' %}",
     "{% static 'js/app.js' %}",
+    "{% static 'js/demandes.js' %}",
     "{% static 'img/favicon.svg' %}",
     "{% static 'img/icon-192.png' %}",
     "{% static 'img/icon-512.png' %}",
@@ -135,6 +141,25 @@ self.addEventListener("pushsubscriptionchange", (event) => {
                 });
             } catch (e) { /* pas de session active : reessai a la prochaine ouverture de page */ }
         })()
+    );
+});
+
+// Background Sync : la page l'enregistre quand la FOSA envoie une commande préparée
+// sans réseau. Le navigateur réveille le service worker dès que le réseau revient,
+// même application fermée, et retente plus tard si la promesse est rejetée. Ce n'est
+// pas une requête interceptée : le service worker envoie lui-même une demande que le
+// serveur traite une seule fois (uuid), quel que soit le nombre d'envois.
+// Navigateurs sans Background Sync : la page envoie à son ouverture et au retour du
+// réseau (js/app.js).
+self.addEventListener("sync", (event) => {
+    if (event.tag !== self.FrpsDemandes.ETIQUETTE_SYNC) return;
+    event.waitUntil(
+        self.FrpsDemandes.envoyerEnAttente({url: URL_DEMANDES, jeton: jetonCsrf}).then(async (bilan) => {
+            // Une page ouverte relit ses demandes pour afficher le résultat.
+            const pages = await self.clients.matchAll({type: "window"});
+            pages.forEach((page) => page.postMessage("demandes-mises-a-jour"));
+            if (bilan.reseau) throw new Error("reseau toujours absent");
+        })
     );
 });
 

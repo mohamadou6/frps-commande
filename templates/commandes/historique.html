@@ -12,10 +12,15 @@
         <tr>
             <td>{{ commande.id }}</td>
             <td>{{ commande.date_creation|date:"d/m/Y H:i" }}</td>
-            <td><span class="badge bg-secondary">{{ commande.get_statut_display }}</span></td>
+            <td>
+                <span class="badge bg-secondary">{{ commande.get_statut_display }}</span>
+                {% if commande.preparee_hors_ligne %}<span class="small text-secondary text-nowrap" title="Préparée hors connexion">📡 hors connexion</span>{% endif %}
+            </td>
             <td>{{ commande.montant_total|floatformat:"0" }} FCFA</td>
             <td>
-                {% if commande.etat_paiement == "payee" %}
+                {% if not commande.est_effective %}
+                <span class="text-secondary">-</span>
+                {% elif commande.etat_paiement == "payee" %}
                 <span class="badge bg-success">Payée</span>
                 {% elif commande.etat_paiement == "partielle" %}
                 <span class="badge bg-warning text-dark">Partielle</span>

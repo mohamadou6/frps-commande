@@ -3,7 +3,20 @@
 {% block content %}
 <h1 class="h4 app-titre mb-3">Commande #{{ commande.id }}</h1>
 <p>Statut : <span class="badge bg-secondary">{{ commande.get_statut_display }}</span></p>
-{% if commande.statut != "brouillon" %}
+{% if commande.preparee_hors_ligne %}
+<div class="alert alert-info">
+    📡 Commande préparée hors connexion sur le téléphone, envoyée au retour du réseau.
+    {% if commande.est_effective %}
+    Validée le {{ commande.date_confirmation|date:"d/m/Y à H:i" }} : le FRPS a servi ce que le stock
+    permettait à ce moment-là, au prix du jour.
+    {% elif commande.statut == "annulee" %}
+    Rien n'a pu être servi : le stock était épuisé à l'arrivée de la demande. Aucun montant n'est dû.
+    {% else %}
+    Reçue, en cours de validation : elle sera terminée au prochain envoi automatique du téléphone.
+    {% endif %}
+</div>
+{% endif %}
+{% if commande.est_effective %}
 <p>
     État de paiement :
     {% if commande.etat_paiement == "payee" %}
@@ -34,13 +47,14 @@
 <div class="table-responsive">
 <table class="table table-striped">
     <thead>
-        <tr><th>Produit</th><th>Quantité</th><th>Prix unitaire</th><th>Sous-total</th></tr>
+        <tr><th>Produit</th>{% if commande.preparee_hors_ligne %}<th>Demandé</th><th>Servi</th>{% else %}<th>Quantité</th>{% endif %}<th>Prix unitaire</th><th>Sous-total</th></tr>
     </thead>
     <tbody>
         {% for ligne in commande.lignes.all %}
         <tr>
             <td>{{ ligne.produit.nom }}</td>
-            <td>{{ ligne.quantite }}</td>
+            {% if commande.preparee_hors_ligne %}<td>{{ ligne.quantite_demandee|default_if_none:"-" }}</td>{% endif %}
+            <td{% if ligne.servie_en_partie %} class="quantite-reduite" title="Stock insuffisant à l'arrivée de la demande"{% endif %}>{{ ligne.quantite }}</td>
             <td>{{ ligne.prix_unitaire_snapshot }} FCFA</td>
             <td>{{ ligne.sous_total|floatformat:"2" }} FCFA</td>
         </tr>
@@ -50,7 +64,7 @@
 </div>
 <h2 class="h5">Total : {{ commande.montant_total|floatformat:"0" }} FCFA</h2>
 <div class="d-flex gap-2 flex-wrap">
-    {% if commande.statut != "brouillon" %}
+    {% if commande.est_effective %}
     <a href="{% url 'commandes:telecharger_pdf' commande.id %}" class="btn btn-outline-secondary">Télécharger le PDF</a>
     <button type="button" class="btn btn-success"
             onclick="partagerPdfWhatsApp('{% url 'commandes:telecharger_pdf' commande.id %}', 'commande_{{ commande.id }}.pdf', 'Commande #{{ commande.id }} - {{ commande.formation_sanitaire.nom }} ({{ commande.montant_total|floatformat:"0" }} FCFA)', this)">

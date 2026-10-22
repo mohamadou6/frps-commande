@@ -166,6 +166,18 @@ worker (le stock affiché peut alors être périmé). Piloté par js/app.js.
         <button type="button" class="btn btn-primary btn-sm" data-hors-ligne-actualiser hidden>Actualiser</button>
     </div>
 </div>
+{% if user.is_authenticated and user.is_formation_sanitaire %}
+{% comment %}
+Commande préparée hors connexion : brouillon, demandes en attente d'envoi et
+résultats, gardés sur le téléphone (js/demandes.js) et affichés ici par js/app.js.
+Dans base.html et non dans le seul catalogue : la FOSA doit voir où en est sa
+commande sur toute page qu'elle rouvre sans réseau.
+{% endcomment %}
+<div id="commande-hors-ligne" class="container mb-3" hidden
+     data-compte="{{ user.pk }}"
+     data-url-envoi="{% url 'commandes:synchroniser_demande' %}"
+     data-jeton="{{ csrf_token }}"></div>
+{% endif %}
 {% comment %}
 Bandeau d'installation. Sans lui, installer l'application suppose d'aller chercher
 « Installer l'application » dans le menu du navigateur — que personne ne trouve —
@@ -212,6 +224,7 @@ La zone est toujours présente : le catalogue y affiche ses ajouts au panier.
     {% block content %}{% endblock %}
 </div>
 <script src="{% static 'vendor/bootstrap/bootstrap.bundle.min.js' %}"></script>
+{% if user.is_authenticated and user.is_formation_sanitaire %}<script src="{% static 'js/demandes.js' %}"></script>{% endif %}
 <script src="{% static 'js/app.js' %}"></script>
 <script>
 // Enveloppe PWA : rend l'application installable sur l'écran d'accueil et permet

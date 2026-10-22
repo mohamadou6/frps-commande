@@ -1,10 +1,10 @@
-# Carte du code — commande-frps
+# Carte du code — commande-frps-hors-ligne
 
-<!-- Genere par la skill carte-du-code le 2026-10-04. NE PAS EDITER A LA MAIN : relancer scripts/generer_carte.py. -->
+<!-- Genere par la skill carte-du-code le 2026-10-23. NE PAS EDITER A LA MAIN : relancer scripts/generer_carte.py. -->
 
 **Lire ce fichier avant d'explorer le depot.** Il donne `fichier:ligne` pour chaque modele, URL, vue et fonction.
 
-9 modules · 13 modeles · 46 URLs · 96 fonctions · 20 gabarits · 5310 lignes de Python
+9 modules · 13 modeles · 47 URLs · 104 fonctions · 20 gabarits · 6038 lignes de Python
 
 ## accounts (339 lignes)
 
@@ -43,7 +43,7 @@
 - *classe* **LoginView**(LoginView) :8 — Redirige après connexion selon le rôle : catalogue pour les formations
   - methodes : get_success_url() :18
 
-## catalogue (578 lignes)
+## catalogue (603 lignes)
 
 ### `catalogue/admin.py` (20 l.)
 - *admin* **RayonAdmin** :7 — list_editable=ordre
@@ -77,74 +77,90 @@
 - URL `''` -> views.liste  `catalogue:liste` :8
 - URL `importer/` -> views.importer_produits  `catalogue:importer` :9
 
-### `catalogue/views.py` (195 l.)
+### `catalogue/views.py` (220 l.)
 - `liste(request)` :16 @formation_sanitaire_required
 - `_lire_fichier_produits(fichier)` :85 — Lit un classeur Excel dont l'en-tête contient une colonne code produit
-- `importer_produits(request)` :133 @admin_frps_required
+- `importer_produits(request)` :141 @admin_frps_required
 
-## commandes (677 lignes)
+## commandes (1298 lignes)
 
-### `commandes/admin.py` (20 l.)
+### `commandes/admin.py` (21 l.)
 - *admin* **LigneCommandeInline** :6
 - *admin* **CommandeAdmin** :14
 
 ### `commandes/context_processors.py` (18 l.)
 - `panier_resume(request)` :4 — Nombre de lignes du panier en cours, pour le badge de la navbar : sans lui,
 
-### `commandes/models.py` (85 l.)
-- *enum* **StatutCommande** :9 — BROUILLON, CONFIRMEE, PAYEE, ANNULEE
-- *modele* **Commande** :16
-  - champs : formation_sanitaire(ForeignKey ->accounts.FormationSanitaire related_name=commandes), statut(Char choices=StatutCommande.choices), montant_total(Decimal), date_creation(DateTime), date_confirmation(DateTime)
-  - methodes : recalculer_montant() :33, montant_paye() :44, solde_restant() :49, etat_paiement() :57
-- *modele* **LigneCommande** :66
-  - champs : commande(ForeignKey ->Commande related_name=lignes), produit(ForeignKey ->catalogue.Produit related_name=lignes_commande), quantite(PositiveInteger), prix_unitaire_snapshot(Decimal)
-  - methodes : sous_total() :81
+### `commandes/models.py` (126 l.)
+- *enum* **StatutCommande** :9 — BROUILLON, CONFIRMEE, PAYEE, ANNULEE, EN_ATTENTE_SYNCHRO
+- *modele* **Commande** :21
+  - champs : formation_sanitaire(ForeignKey ->accounts.FormationSanitaire related_name=commandes), statut(Char choices=StatutCommande.choices), montant_total(Decimal), date_creation(DateTime), date_confirmation(DateTime), uuid_client(UUID)
+  - methodes : recalculer_montant() :44, preparee_hors_ligne() :55, est_effective() :59, montant_paye() :64, solde_restant() :69, etat_paiement() :77
+- *modele* **LigneCommande** :94
+  - champs : commande(ForeignKey ->Commande related_name=lignes), produit(ForeignKey ->catalogue.Produit related_name=lignes_commande), quantite(PositiveInteger), prix_unitaire_snapshot(Decimal), quantite_demandee(PositiveInteger)
+  - methodes : servie_en_partie() :117, sous_total() :122
+- *classe* **LigneCommandeQuerySet**(QuerySet) :86
+  - methodes : servies() :87
 
-### `commandes/services.py` (127 l.)
+### `commandes/services.py` (255 l.)
 - *classe* **StockInsuffisantError**(Exception) :14
-- `get_panier(formation_sanitaire)` :18 — Retourne le panier (commande brouillon) en cours, en crée un si besoin.
-- `ajouter_produit(commande, produit, quantite)` :28
-- `retirer_produit(commande, produit)` :50
-- `confirmer_commande(commande)` :55 — Verrouille la commande, débite le stock, notifie le personnel FRPS chargé du stock.
-- `supprimer_commande(commande)` :92 — Supprime une commande et remet en stock ce qu'elle avait débité.
+- *classe* **DemandeInvalideError**(ValueError) :18 — Demande hors connexion que le serveur ne peut pas accepter, même en la renvoyant.
+- `get_panier(formation_sanitaire)` :22 — Retourne le panier (commande brouillon) en cours, en crée un si besoin.
+- `ajouter_produit(commande, produit, quantite)` :32
+- `retirer_produit(commande, produit)` :54
+- `confirmer_commande(commande)` :59 — Verrouille la commande, débite le stock, notifie le personnel FRPS chargé du stock.
+- `_debiter_stock(lignes)` :79 — À appeler dans une transaction : une ligne refusée lève StockInsuffisantError,
+- `synchroniser_demande(formation_sanitaire, uuid_client, quantites)` :104 — Reçoit puis valide une demande hors connexion. Retourne (commande, reçue_maintenant).
+- `recevoir_demande(formation_sanitaire, uuid_client, quantites)` :116 — Enregistre la demande telle qu'envoyée, sans toucher au stock.
+- `valider_demande(commande)` :165 — Sert la demande avec le stock et les prix du moment, puis la confirme.
+- `supprimer_commande(commande)` :220 — Supprime une commande et remet en stock ce qu'elle avait débité.
 
-### `commandes/tests.py` (242 l.)
-- *classe* **CommandeWorkflowTests**(TestCase) :20
+### `commandes/tests.py` (575 l.)
+- *classe* **CommandeWorkflowTests**(TestCase) :23
   - tests : test_ajouter_produit_respecte_le_stock, test_confirmer_commande_notifie_personnel_stock, test_confirmer_panier_vide_leve_une_erreur
-- *classe* **TelechargerPdfTests**(TestCase) :56
+- *classe* **TelechargerPdfTests**(TestCase) :59
   - tests : test_le_proprietaire_peut_telecharger_le_pdf, test_un_autre_utilisateur_ne_peut_pas_telecharger
-- *classe* **SupprimerCommandeTests**(TestCase) :87 — Suppression d'une commande validée par erreur par une FOSA, réservée à l'admin.
+- *classe* **SupprimerCommandeTests**(TestCase) :90 — Suppression d'une commande validée par erreur par une FOSA, réservée à l'admin.
   - tests : test_supprimer_une_commande_confirmee_remet_le_stock, test_supprimer_un_brouillon_ne_gonfle_pas_le_stock, test_admin_peut_supprimer_via_le_bouton, test_personnel_non_admin_ne_peut_pas_supprimer, test_fosa_ne_peut_pas_supprimer_sa_propre_commande, test_un_simple_GET_ne_supprime_rien, test_le_bouton_n_apparait_que_pour_l_admin
-- *classe* **ArrondiDesMontantsTests**(TestCase) :181 — Le prix unitaire et le total de chaque ligne gardent leurs décimales ; seul le
+- *classe* **ArrondiDesMontantsTests**(TestCase) :184 — Le prix unitaire et le total de chaque ligne gardent leurs décimales ; seul le
   - tests : test_le_total_general_est_arrondi_les_lignes_gardent_leurs_decimales, test_un_total_en_virgule_cinquante_monte_au_franc_superieur, test_la_page_affiche_la_ligne_avec_decimales_et_le_total_arrondi, test_la_migration_arrondit_les_commandes_deja_passees
+- *classe* **AjoutAuPanierSansRechargementTests**(TestCase) :248 — Le catalogue ajoute au panier sans recharger la page (js/app.js) : sur le réseau
+  - tests : test_ajout_instantane_repond_en_json_avec_le_panier_a_jour, test_stock_insuffisant_renvoie_le_message_sans_rien_ajouter, test_quantite_illisible_donne_un_message_en_francais, test_sans_javascript_le_formulaire_ramene_au_catalogue, test_le_catalogue_active_lajout_instantane_pour_la_fosa, test_les_fiches_portent_le_produit_pour_l_ajout_sans_reseau
+- *classe* **CommandeHorsConnexionTests**(TestCase) :313 — Commande préparée sans réseau sur le téléphone (js/demandes.js), envoyée au retour
+  - tests : test_la_demande_est_validee_a_son_arrivee, test_un_renvoi_de_la_meme_demande_ne_cree_ni_doublon_ni_second_debit, test_stock_insuffisant_a_l_arrivee_sert_ce_qui_reste, test_rien_de_disponible_annule_la_demande_sans_debit_ni_notification, test_le_prix_est_recalcule_au_serveur, test_un_produit_desactive_entre_temps_n_est_pas_servi, test_un_produit_supprime_du_catalogue_est_ignore, test_le_meme_produit_en_double_est_additionne, test_une_demande_restee_en_attente_est_terminee_au_renvoi, test_une_demande_en_attente_ne_compte_pas_comme_commande_effective, test_l_identifiant_d_une_autre_fosa_est_refuse_sans_rien_reveler, test_une_demande_preparee_sous_un_autre_compte_n_est_pas_traitee, test_une_demande_illisible_est_refusee_sans_rien_creer, test_un_simple_GET_ne_cree_rien, test_le_personnel_frps_ne_peut_pas_envoyer_de_demande, test_sans_session_la_demande_n_est_pas_traitee, test_le_detail_montre_le_demande_et_le_servi, test_l_historique_signale_la_commande_preparee_hors_connexion, test_les_lignes_non_servies_restent_hors_du_sms_et_de_l_email, test_une_commande_en_ligne_garde_son_affichage
 
-### `commandes/urls.py` (20 l.)
+### `commandes/urls.py` (21 l.)
 - URL `''` -> views.panier  `commandes:panier` :8
 - URL `ajouter/<int:produit_id>/` -> views.ajouter  `commandes:ajouter` :9
 - URL `modifier-quantite/<int:produit_id>/` -> views.modifier_quantite  `commandes:modifier_quantite` :10
 - URL `retirer/<int:produit_id>/` -> views.retirer  `commandes:retirer` :11
 - URL `confirmer/` -> views.confirmer  `commandes:confirmer` :12
-- URL `historique/` -> views.historique  `commandes:historique` :13
-- URL `<int:commande_id>/pdf/<str:token>/` -> views.pdf_commande  `commandes:pdf` :14
-- URL `<int:commande_id>/telecharger/` -> views.telecharger_pdf  `commandes:telecharger_pdf` :15
-- URL `<int:commande_id>/telecharger-staff/` -> views.telecharger_pdf_staff  `commandes:telecharger_pdf_staff` :16
-- URL `<int:commande_id>/supprimer/` -> views.supprimer  `commandes:supprimer` :17
-- URL `<int:commande_id>/` -> views.detail  `commandes:detail` :18
+- URL `demandes/synchroniser/` -> views.synchroniser_demande  `commandes:synchroniser_demande` :13
+- URL `historique/` -> views.historique  `commandes:historique` :14
+- URL `<int:commande_id>/pdf/<str:token>/` -> views.pdf_commande  `commandes:pdf` :15
+- URL `<int:commande_id>/telecharger/` -> views.telecharger_pdf  `commandes:telecharger_pdf` :16
+- URL `<int:commande_id>/telecharger-staff/` -> views.telecharger_pdf_staff  `commandes:telecharger_pdf_staff` :17
+- URL `<int:commande_id>/supprimer/` -> views.supprimer  `commandes:supprimer` :18
+- URL `<int:commande_id>/` -> views.detail  `commandes:detail` :19
 
-### `commandes/views.py` (165 l.)
-- `panier(request)` :19 @formation_sanitaire_only_required
-- `ajouter(request, produit_id)` :26 @formation_sanitaire_only_required @require_POST
-- `modifier_quantite(request, produit_id)` :40 @formation_sanitaire_only_required @require_POST — Corrige la quantité d'une ligne directement depuis le panier : il fallait
-- `retirer(request, produit_id)` :71 @formation_sanitaire_only_required @require_POST
-- `confirmer(request)` :81 @formation_sanitaire_only_required @require_POST
-- `historique(request)` :95 @formation_sanitaire_only_required
-- `detail(request, commande_id)` :106 @formation_sanitaire_only_required
-- `telecharger_pdf(request, commande_id)` :116 @formation_sanitaire_only_required — Téléchargement du PDF par la FOSA elle-même (pour l'enregistrer ou le partager,
-- `telecharger_pdf_staff(request, commande_id)` :129 @personnel_frps_required — Téléchargement du PDF par le personnel FRPS (depuis la page notifications),
-- `pdf_commande(request, commande_id, token)` :139 — Sert le PDF de la commande sans authentification : accès protégé par un jeton
-- `supprimer(request, commande_id)` :153 @admin_frps_required @require_POST — Suppression d'une commande par l'admin FRPS, avec remise en stock.
+### `commandes/views.py` (282 l.)
+- `panier(request)` :24 @formation_sanitaire_only_required
+- `ajouter(request, produit_id)` :31 @formation_sanitaire_only_required @require_POST
+- `modifier_quantite(request, produit_id)` :71 @formation_sanitaire_only_required @require_POST — Corrige la quantité d'une ligne directement depuis le panier : il fallait
+- `retirer(request, produit_id)` :102 @formation_sanitaire_only_required @require_POST
+- `confirmer(request)` :112 @formation_sanitaire_only_required @require_POST
+- `_lire_quantites(lignes)` :131 — [{"produit": id, "quantite": n}, …] -> {id: n}. Lève ValueError si illisible.
+- `synchroniser_demande(request)` :174 @formation_sanitaire_only_required @require_POST — Reçoit une commande préparée hors connexion (js/demandes.js) et la valide.
+- `historique(request)` :212 @formation_sanitaire_only_required
+- `detail(request, commande_id)` :223 @formation_sanitaire_only_required
+- `telecharger_pdf(request, commande_id)` :233 @formation_sanitaire_only_required — Téléchargement du PDF par la FOSA elle-même (pour l'enregistrer ou le partager,
+- `telecharger_pdf_staff(request, commande_id)` :246 @personnel_frps_required — Téléchargement du PDF par le personnel FRPS (depuis la page notifications),
+- `pdf_commande(request, commande_id, token)` :256 — Sert le PDF de la commande sans authentification : accès protégé par un jeton
+- `supprimer(request, commande_id)` :270 @admin_frps_required @require_POST — Suppression d'une commande par l'admin FRPS, avec remise en stock.
+- *const* `MAX_LIGNES_DEMANDE = 2000` :127
+- *const* `MAX_QUANTITE_DEMANDEE = 10000000` :128
 
-## frps_project (366 lignes)
+## frps_project (448 lignes)
 
 ### `frps_project/formatage.py` (29 l.)
 - `arrondir_montant(valeur)` :4 — Total général ramené au FCFA entier, demi vers le haut (12,50 -> 13).
@@ -157,7 +173,7 @@
 - `assetlinks(request)` :46 @require_GET — Lien vérifié entre le domaine et l'application Android (Digital Asset Links).
 - `hors_ligne(request)` :73 @require_GET — Page de repli affichée quand une page non encore consultée est demandée sans réseau.
 
-### `frps_project/settings.py` (228 l.)
+### `frps_project/settings.py` (232 l.)
 - *const* `AUTH_USER_MODEL = 'accounts.User'` :51
 - *const* `ROOT_URLCONF = 'frps_project.urls'` :64
 - *const* `WSGI_APPLICATION = 'frps_project.wsgi.application'` :83
@@ -171,6 +187,12 @@
 - *const* `LOGIN_URL = 'login'` :144
 - *const* `LOGIN_REDIRECT_URL = 'catalogue:liste'` :145
 - *const* `LOGOUT_REDIRECT_URL = 'login'` :146
+
+### `frps_project/tests_pwa.py` (78 l.)
+- *classe* **HorsConnexionTests**(TestCase) :8 — Comportement sans réseau : servi par le service worker, vérifié ici sur le
+  - tests : test_louverture_hors_ligne_retombe_sur_la_page_daccueil_du_compte, test_une_page_resservie_depuis_le_cache_est_marquee, test_la_page_pas_de_connexion_liste_les_pages_enregistrees, test_les_pages_portent_le_bandeau_hors_connexion
+- *classe* **CommandeHorsConnexionPwaTests**(TestCase) :42 — Commande préparée sans réseau : envoyée par le service worker (Background Sync)
+  - tests : test_le_service_worker_envoie_les_demandes_en_arriere_plan, test_le_module_des_demandes_est_mis_en_cache_a_l_installation, test_seule_une_fosa_porte_le_panneau_de_commande_hors_connexion
 
 ### `frps_project/urls.py` (28 l.)
 - URL `admin/` -> urls :13
