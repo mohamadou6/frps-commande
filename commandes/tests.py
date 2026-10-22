@@ -239,3 +239,59 @@ class ArrondiDesMontantsTests(TestCase):
 
         commande.refresh_from_db()
         self.assertEqual(commande.montant_total, Decimal("1719"))
+
+
+@override_settings(SMS_BACKEND="log", WHATSAPP_BACKEND="log")
+class AjoutAuPanierSansRechargementTests(TestCase):
+    """Le catalogue ajoute au panier sans recharger la page (js/app.js) : sur le réseau
+    lent des FOSA, recharger tout le catalogue à chaque produit coûtait ~10 s."""
+
+    AJAX = {"HTTP_X_REQUESTED_WITH": "XMLHttpRequest"}
+
+    def setUp(self):
+        self.fosa_user = User.objects.create_user(username="csi1", password="x", role=Role.FORMATION_SANITAIRE)
+        FormationSanitaire.objects.create(user=self.fosa_user, nom="CSI Test")
+        self.produit = Produit.objects.create(
+            code_sage="MED-AJAX", nom="Paracetamol 500 mg", prix_unitaire=Decimal("1250.50"), stock_disponible=10
+        )
+        self.client.force_login(self.fosa_user)
+
+    def _ajouter(self, quantite, **entetes):
+        return self.client.post(
+            reverse("commandes:ajouter", args=[self.produit.pk]), {"quantite": quantite}, **entetes
+        )
+
+    def test_ajout_instantane_repond_en_json_avec_le_panier_a_jour(self):
+        reponse = self._ajouter("3", **self.AJAX)
+
+        self.assertEqual(reponse.status_code, 200)
+        donnees = reponse.json()
+        self.assertTrue(donnees["ok"])
+        self.assertEqual(donnees["quantite"], "3")
+        self.assertEqual(donnees["panier_nb"], 1)
+        self.assertEqual(donnees["panier_montant"], formater_montant(Decimal("3752")))
+        self.assertFalse(donnees["panier_montant_nul"])
+
+    def test_stock_insuffisant_renvoie_le_message_sans_rien_ajouter(self):
+        reponse = self._ajouter("50", **self.AJAX)
+
+        self.assertEqual(reponse.status_code, 400)
+        self.assertFalse(reponse.json()["ok"])
+        self.assertIn("Stock insuffisant", reponse.json()["message"])
+        self.assertFalse(Commande.objects.filter(lignes__produit=self.produit).exists())
+
+    def test_quantite_illisible_donne_un_message_en_francais(self):
+        reponse = self._ajouter("abc", **self.AJAX)
+
+        self.assertEqual(reponse.json()["message"], "Quantité invalide.")
+
+    def test_sans_javascript_le_formulaire_ramene_au_catalogue(self):
+        reponse = self._ajouter("2")
+
+        self.assertRedirects(reponse, reverse("catalogue:liste"), fetch_redirect_response=False)
+
+    def test_le_catalogue_active_lajout_instantane_pour_la_fosa(self):
+        page = self.client.get(reverse("catalogue:liste")).content.decode()
+
+        self.assertIn("data-ajout-instantane", page)
+        self.assertIn("form-ajout", page)

@@ -157,6 +157,16 @@ menu complet (même panneau que l'initiale en haut à droite).
 {% endwith %}
 {% endif %}
 {% comment %}
+Bandeau hors connexion : réseau absent, ou page resservie depuis le cache du service
+worker (le stock affiché peut alors être périmé). Piloté par js/app.js.
+{% endcomment %}
+<div id="bandeau-hors-ligne" class="container mb-3" role="status" hidden>
+    <div class="alert alert-warning d-flex flex-wrap align-items-center justify-content-between gap-2 mb-0">
+        <span>📡 <span data-hors-ligne-texte></span></span>
+        <button type="button" class="btn btn-primary btn-sm" data-hors-ligne-actualiser hidden>Actualiser</button>
+    </div>
+</div>
+{% comment %}
 Bandeau d'installation. Sans lui, installer l'application suppose d'aller chercher
 « Installer l'application » dans le menu du navigateur — que personne ne trouve —
 et, sur iPhone, aucune proposition automatique n'existe. Piloté par js/app.js.

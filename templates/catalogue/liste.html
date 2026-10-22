@@ -56,7 +56,7 @@ Bandeau d'en-tête : titre, nombre de produits et recherche réunis. Tout en CSS
 
     <div>
         {% if produits %}
-        <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-3 g-3 catalogue-grille">
+        <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-3 g-3 catalogue-grille"{% if user.is_formation_sanitaire %} data-ajout-instantane{% endif %}>
             {% for produit in produits %}
             <div class="col">
                 <div class="produit-card{% if produit.quantite_panier %} au-panier{% endif %}">
@@ -82,7 +82,7 @@ Bandeau d'en-tête : titre, nombre de produits et recherche réunis. Tout en CSS
                     {% if produit.quantite_panier %}
                     <div class="produit-au-panier">🛒 Déjà au panier : {{ produit.quantite_panier }}</div>
                     {% endif %}
-                    <form method="post" action="{% url 'commandes:ajouter' produit.id %}" class="d-flex gap-2">
+                    <form method="post" action="{% url 'commandes:ajouter' produit.id %}" class="d-flex gap-2 form-ajout">
                         {% csrf_token %}
                         <input type="number" name="quantite" min="1" max="{{ produit.stock_disponible|unlocalize }}" value="1"
                                class="form-control form-control-sm quantite-input"

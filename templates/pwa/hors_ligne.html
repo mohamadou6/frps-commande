@@ -41,6 +41,20 @@
             font-size: 1rem;
             cursor: pointer;
         }
+        button.secondaire { background: transparent; color: #0b7a45; border: 1px solid #0b7a45; }
+        .actions { display: flex; flex-wrap: wrap; gap: .5rem; justify-content: center; }
+        .pages { list-style: none; padding: 0; margin: 0 0 1.2rem; text-align: left; }
+        .pages a {
+            display: block;
+            padding: .65rem .9rem;
+            margin-bottom: .4rem;
+            border: 1px solid #dbe9e0;
+            border-radius: 10px;
+            color: #0b7a45;
+            font-weight: 600;
+            text-decoration: none;
+        }
+        .avertissement { background: #fff4e0; color: #7a4b00; border-radius: 10px; padding: .7rem .9rem; }
         /* Mode sombre du téléphone. Page autonome (servie hors ligne par le service
            worker) : elle ne charge pas css/app.css, d'où ces quelques règles ici. */
         @media (prefers-color-scheme: dark) {
@@ -48,6 +62,9 @@
             .carte { background: #141f19; }
             h1 { color: #4fd18f; }
             p { color: #c9d6ce; }
+            .pages a { border-color: #2a3b31; color: #4fd18f; }
+            button.secondaire { color: #4fd18f; border-color: #4fd18f; }
+            .avertissement { background: #3a2c10; color: #f3d39a; }
         }
     </style>
 </head>
@@ -55,15 +72,82 @@
 <div class="carte">
     <img src="{% static 'img/icon-192.png' %}" alt="FRPS Nord">
     <h1>Pas de connexion</h1>
-    <p>
+    <p id="message-action" class="avertissement" hidden>
+        Votre dernière action n'a pas pu être envoyée : rien n'a été enregistré.
+        Revenez à la page précédente et recommencez quand le réseau sera revenu.
+    </p>
+    <p id="message-page">
         Cette page n'a pas encore été consultée sur ce téléphone, elle ne peut donc
         pas s'afficher hors connexion.
     </p>
-    <p>
-        Les pages déjà ouvertes au moins une fois, dont le catalogue, restent
-        accessibles sans réseau.
-    </p>
-    <button onclick="location.reload()">Réessayer</button>
+    <div id="bloc-pages" hidden>
+        <p>Pages enregistrées sur ce téléphone, consultables sans réseau :</p>
+        <ul class="pages" id="liste-pages"></ul>
+    </div>
+    <div class="actions">
+        <button type="button" id="bouton-reessayer">Réessayer</button>
+        <button type="button" class="secondaire" id="bouton-retour" hidden>Page précédente</button>
+    </div>
 </div>
+<script>
+// Page servie par le service worker à la place d'une page jamais consultée.
+(function () {
+    // Adresses qui n'existent qu'en envoi de formulaire (ajout au panier, validation,
+    // paiement…). Le navigateur les recharge en simple lecture après un envoi raté :
+    // « Réessayer » donnait alors une page blanche. On renvoie plutôt en arrière.
+    var ACTION = /\/(ajouter|modifier-quantite|retirer|confirmer|confirmer-mock|supprimer|initier|especes|modifier)(\/|$)/;
+    var estAction = ACTION.test(location.pathname);
+    var reessayer = document.getElementById("bouton-reessayer");
+    var retour = document.getElementById("bouton-retour");
+
+    if (estAction) {
+        document.getElementById("message-action").hidden = false;
+        document.getElementById("message-page").hidden = true;
+        reessayer.hidden = true;
+    }
+    if (history.length > 1) retour.hidden = false;
+    if (estAction && retour.hidden) reessayer.hidden = false;
+
+    reessayer.addEventListener("click", function () {
+        if (estAction) location.href = "/"; else location.reload();
+    });
+    retour.addEventListener("click", function () { history.back(); });
+
+    // Liste des pages déjà consultées, lue dans le cache du service worker : sans
+    // barre d'adresse (application installée), c'était le seul moyen de les rouvrir.
+    if (!window.caches) return;
+    caches.keys().then(function (noms) {
+        var nom = noms.filter(function (n) { return n.indexOf("frps-pages-") === 0; })[0];
+        if (!nom) return null;
+        return caches.open(nom).then(function (cache) {
+            return cache.keys().then(function (requetes) {
+                return Promise.all(requetes.slice(0, 30).map(function (requete) {
+                    return cache.match(requete).then(function (reponse) {
+                        return reponse.text();
+                    }).then(function (html) {
+                        var titre = (html.match(/<title>([^<]*)<\/title>/) || [])[1] || "";
+                        titre = titre.replace(/\s*-\s*Commande FRPS\s*$/, "").trim();
+                        var url = new URL(requete.url);
+                        return {url: url.pathname + url.search, titre: titre || url.pathname};
+                    });
+                }));
+            });
+        });
+    }).then(function (pages) {
+        if (!pages || !pages.length) return;
+        var liste = document.getElementById("liste-pages");
+        pages.sort(function (a, b) { return a.titre.localeCompare(b.titre, "fr"); });
+        pages.forEach(function (page) {
+            var item = document.createElement("li");
+            var lien = document.createElement("a");
+            lien.href = page.url;
+            lien.textContent = page.titre;
+            item.appendChild(lien);
+            liste.appendChild(item);
+        });
+        document.getElementById("bloc-pages").hidden = false;
+    }).catch(function () { /* cache illisible : la page garde son message de base */ });
+})();
+</script>
 </body>
 </html>

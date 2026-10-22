@@ -120,6 +120,65 @@
 
     window.frpsToast = afficherToast;
 
+    // ---------- Envoi sans réseau ----------
+    // Un formulaire envoyé sans réseau menait à une page d'erreur du navigateur,
+    // puis à « Pas de connexion », et la saisie était perdue. Quand le téléphone se
+    // sait hors ligne, on bloque l'envoi sur place : la page et ses saisies restent.
+    // Écoute en phase de capture, pour passer avant l'ajout au panier sans
+    // rechargement et la barre de chargement.
+    window.addEventListener("submit", function (evenement) {
+        if (navigator.onLine !== false) return;
+        var formulaire = evenement.target;
+        if ((formulaire.getAttribute("method") || "get").toLowerCase() !== "post") return;
+        evenement.preventDefault();
+        evenement.stopImmediatePropagation();
+        afficherToast("Pas de réseau : rien n'a été envoyé. Vos saisies sont conservées, réessayez quand le réseau revient.", "warning");
+    }, true);
+
+    // ---------- Bandeau hors connexion ----------
+    // Le service worker marque <html data-hors-ligne="1"> quand il ressert une page
+    // enregistrée (réseau absent ou trop lent) : sans ce bandeau, rien ne la
+    // distinguait d'une page à jour, stock compris.
+    (function () {
+        var bandeau = document.getElementById("bandeau-hors-ligne");
+        if (!bandeau) return;
+        var texte = bandeau.querySelector("[data-hors-ligne-texte]");
+        var actualiser = bandeau.querySelector("[data-hors-ligne-actualiser]");
+        var racine = document.documentElement;
+        var depuisCache = racine.getAttribute("data-hors-ligne") === "1";
+
+        function dateEnregistrement() {
+            var brut = racine.getAttribute("data-enregistre-le");
+            var date = brut ? new Date(brut) : null;
+            if (!date || isNaN(date.getTime())) return "";
+            return " le " + date.toLocaleDateString("fr-FR", {day: "2-digit", month: "2-digit"}) +
+                " à " + date.toLocaleTimeString("fr-FR", {hour: "2-digit", minute: "2-digit"});
+        }
+
+        function afficher() {
+            var horsLigne = navigator.onLine === false;
+            if (!horsLigne && !depuisCache) {
+                bandeau.hidden = true;
+                return;
+            }
+            var message = horsLigne ? "Pas de réseau. " : "Réseau lent ou coupé. ";
+            message += depuisCache
+                ? "Version enregistrée" + dateEnregistrement() + " : le stock et les prix ont pu changer."
+                : "Les pages déjà ouvertes restent consultables ; rien ne sera envoyé avant le retour du réseau.";
+            texte.textContent = message;
+            actualiser.hidden = horsLigne || !depuisCache;
+            bandeau.hidden = false;
+        }
+
+        actualiser.addEventListener("click", function () {
+            demarrerChargement();
+            window.location.reload();
+        });
+        window.addEventListener("online", afficher);
+        window.addEventListener("offline", afficher);
+        afficher();
+    })();
+
     if (zoneToasts) {
         Array.prototype.forEach.call(zoneToasts.querySelectorAll(".toast-msg"), brancherToast);
     }
@@ -404,7 +463,7 @@
             }).catch(function () {
                 bouton.disabled = false;
                 bouton.textContent = "Ajouter";
-                afficherErreur(fiche, "Connexion interrompue. Réessayez.");
+                afficherErreur(fiche, "Connexion interrompue : produit non ajouté. Réessayez.");
             }).then(function () {
                 if (minuteur) clearTimeout(minuteur);
             });

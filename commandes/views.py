@@ -1,5 +1,5 @@
 from django.contrib import messages
-from django.http import Http404, HttpResponse
+from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
@@ -9,6 +9,7 @@ from accounts.decorators import (
     personnel_frps_required,
 )
 from catalogue.models import Produit
+from frps_project.formatage import formater_montant
 from notifications.pdf import generer_pdf_commande, verifier_token_pdf
 
 from . import services
@@ -26,12 +27,38 @@ def panier(request):
 def ajouter(request, produit_id):
     produit = get_object_or_404(Produit, pk=produit_id, actif=True)
     commande = services.get_panier(request.user.formation_sanitaire)
+    erreur = None
     try:
         quantite = int(request.POST.get("quantite", "1"))
-        services.ajouter_produit(commande, produit, quantite)
+    except ValueError:
+        erreur = "Quantité invalide."
+    else:
+        try:
+            services.ajouter_produit(commande, produit, quantite)
+        except (services.StockInsuffisantError, ValueError) as exc:
+            erreur = str(exc)
+
+    # Le catalogue ajoute sans recharger la page (js/app.js) : sur réseau lent, recharger
+    # tout le catalogue à chaque produit coûtait une dizaine de secondes. Sans
+    # JavaScript, le formulaire arrive ici aussi et repart sur le catalogue.
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        if erreur:
+            return JsonResponse({"ok": False, "message": erreur}, status=400)
+        return JsonResponse(
+            {
+                "ok": True,
+                "message": f"{produit.nom} ajouté au panier.",
+                "quantite": f"{quantite:,}".replace(",", " "),
+                "panier_nb": commande.lignes.count(),
+                "panier_montant": formater_montant(commande.montant_total),
+                "panier_montant_nul": not commande.montant_total,
+            }
+        )
+
+    if erreur:
+        messages.error(request, erreur)
+    else:
         messages.success(request, f"{produit.nom} ajouté au panier.")
-    except (services.StockInsuffisantError, ValueError) as exc:
-        messages.error(request, str(exc))
     return redirect("catalogue:liste")
 
 

@@ -3,7 +3,7 @@
 // URL hachées réelles, et ce fichier change dès qu'un fichier statique change —
 // ce qui suffit au navigateur pour détecter une mise à jour.
 
-const VERSION = "v6"; // v5 : charte sortie dans css/app.css et js/app.js ; v6 : bandeaux et relief sur ordinateur
+const VERSION = "v7"; // v5 : charte sortie dans css/app.css et js/app.js ; v6 : bandeaux et relief sur ordinateur ; v7 : ouverture hors ligne, page « Pas de connexion » avec liens
 const CACHE_COQUILLE = "frps-coquille-" + VERSION; // ressources fixes de l'app
 const CACHE_PAGES = "frps-pages-" + VERSION; // pages HTML déjà consultées
 const PAGE_HORS_LIGNE = "{% url 'hors_ligne' %}";
@@ -11,6 +11,13 @@ const PREFIXE_STATIC = "{% get_static_prefix %}";
 const VAPID_PUBLIC_KEY = "{{ vapid_public_key }}";
 const URL_ABONNEMENT_PUSH = "{% url 'notifications:abonnement_push' %}";
 const CSRF_TOKEN = "{{ csrf_token }}";
+
+// L'icône de l'écran d'accueil (et l'APK) ouvre « / », qui n'est qu'une redirection :
+// elle n'est donc jamais mise en cache. Sans réseau, on ouvre à la place la page
+// d'accueil réelle du compte si elle a déjà été consultée (catalogue pour une FOSA,
+// tableau de bord pour le personnel). Sans ce repli, l'application installée
+// affichait « Pas de connexion » alors que le catalogue était en mémoire.
+const PAGES_ACCUEIL = ["{% url 'catalogue:liste' %}", "{% url 'statistiques:index' %}"];
 
 // Réseau lent : au-delà de ce délai on sert la version en cache plutôt que de
 // laisser la FOSA devant une page blanche.
@@ -219,7 +226,7 @@ async function reseauDabord(event) {
             event.waitUntil(
                 reseau.then((reponse) => mettreEnCache(cache, requete, reponse)).catch(() => {})
             );
-            return enCache;
+            return marquerHorsLigne(enCache);
         }
     }
 
@@ -231,7 +238,32 @@ async function reseauDabord(event) {
         mettreEnCache(cache, requete, reponse);
         return reponse;
     } catch (erreur) {
+        if (new URL(requete.url).pathname === "/") {
+            for (const page of PAGES_ACCUEIL) {
+                const accueil = await cache.match(page);
+                if (accueil) return marquerHorsLigne(accueil);
+            }
+        }
         return (await caches.match(PAGE_HORS_LIGNE)) || Response.error();
+    }
+}
+
+// Une page resservie depuis le cache ressemble trait pour trait à une page à jour :
+// la FOSA pouvait se fier à un stock périmé. On marque donc la balise <html> (date
+// d'enregistrement tirée de l'en-tête Date) pour que js/app.js affiche un bandeau.
+// Ne s'exécute que sur le chemin de repli, jamais sur une page venue du réseau.
+async function marquerHorsLigne(reponse) {
+    try {
+        const texte = await reponse.clone().text();
+        const date = (reponse.headers.get("Date") || "").replace(/"/g, "");
+        const entetes = new Headers(reponse.headers);
+        entetes.delete("Content-Length");
+        return new Response(
+            texte.replace("<html", '<html data-hors-ligne="1" data-enregistre-le="' + date + '"'),
+            {status: reponse.status, statusText: reponse.statusText, headers: entetes}
+        );
+    } catch (erreur) {
+        return reponse;
     }
 }
 
