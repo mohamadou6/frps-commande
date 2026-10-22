@@ -2,24 +2,6 @@
 {% load l10n %}
 {% block title %}Panier - Commande FRPS{% endblock %}
 {% block content %}
-<style>
-    .quantite-panier {
-        width: 78px;
-        border-radius: 999px;
-        text-align: center;
-        font-weight: 600;
-        border-color: #cfe0d6;
-    }
-    .quantite-panier:focus {
-        border-color: #17a768;
-        box-shadow: 0 0 0 .2rem rgba(23, 167, 104, .18);
-    }
-    /* Téléphone : cibles tactiles confortables, le tableau défile déjà
-       horizontalement dans .table-responsive. */
-    @media (max-width: 767px) {
-        .quantite-panier { height: 40px; }
-    }
-</style>
 <h1 class="h4 app-titre mb-3">Mon panier</h1>
 <div class="table-responsive">
 <table class="table table-striped align-middle">

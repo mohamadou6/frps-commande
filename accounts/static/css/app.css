@@ -1,0 +1,1334 @@
+/* Charte de l'application FRPS — toute la mise en forme propre à l'app.
+   Fichier statique (et non bloc <style> dans base.html) : téléchargé une seule fois,
+   puis servi par le cache du service worker. Tout en CSS, aucune image : le réseau
+   des FOSA est lent. Les couleurs passent par des variables pour le mode sombre. */
+
+/* ---------- Couleurs ---------- */
+:root {
+    --app-vert: #0f9d58;
+    --app-vert-fonce: #0b7a45;
+    --app-vert-clair: #17a768;
+    --app-vert-actif: #0b7a45;
+    --app-fond: #f4f8f5;
+    --app-surface: #fff;
+    --app-champ: #f6faf8;
+    --app-texte: #17251d;
+    --app-titre: #12321f;
+    --app-texte-2: #6c8a79;
+    --app-bordure: #e6efe9;
+    --app-bordure-2: #dbe9e0;
+    --app-bordure-champ: #cfe0d6;
+    --app-entete-tableau: #f0f6f2;
+    --app-survol: #f2f8f4;
+    --app-teinte-vert: #e8f6ee;
+    --app-teinte-vert-bord: #cdeadb;
+    --app-texte-vert: #14603c;
+    --app-teinte-bleu: #e8f2fb;
+    --app-teinte-bleu-bord: #cfe2f5;
+    --app-texte-bleu: #14456e;
+    --app-teinte-rouge: #fdecec;
+    --app-texte-rouge: #b42318;
+    --app-ombre: 0 6px 18px -14px rgba(6, 60, 35, .45);
+    --app-ombre-survol: 0 14px 28px -16px rgba(15, 157, 88, .5);
+    --app-navbar: linear-gradient(90deg, #0b7a45 0%, #12925a 55%, #17a768 100%);
+    --onglets-h: 60px;
+    --app-lueur: rgba(15, 157, 88, .16);
+}
+
+/* Mode sombre : suit le réglage du téléphone (attribut posé par le script du <head>
+   de base.html). Bootstrap 5.3 gère lui-même champs, menus et tableaux ; on ne
+   redéfinit que ses couleurs de fond pour garder la teinte verte de la marque. */
+[data-bs-theme="dark"] {
+    --app-vert-actif: #4fd18f;
+    --app-fond: #0c1410;
+    --app-surface: #141f19;
+    --app-champ: #101a15;
+    --app-texte: #e2ebe5;
+    --app-titre: #f0f6f2;
+    --app-texte-2: #94a99c;
+    --app-bordure: #233229;
+    --app-bordure-2: #2b3d33;
+    --app-bordure-champ: #33473b;
+    --app-entete-tableau: #1a2820;
+    --app-survol: #1b2a22;
+    --app-teinte-vert: #123323;
+    --app-teinte-vert-bord: #1d4a33;
+    --app-texte-vert: #8fdcb2;
+    --app-teinte-bleu: #12283b;
+    --app-teinte-bleu-bord: #1d3d5a;
+    --app-texte-bleu: #9cc8f0;
+    --app-teinte-rouge: #3a1714;
+    --app-texte-rouge: #ff8a80;
+    --app-ombre: 0 6px 18px -12px rgba(0, 0, 0, .7);
+    --app-ombre-survol: 0 14px 28px -14px rgba(0, 0, 0, .8);
+    --app-navbar: linear-gradient(90deg, #0a5232 0%, #0c6a40 55%, #0f7d4b 100%);
+    --app-lueur: rgba(31, 190, 110, .14);
+    --bs-body-bg: #141f19;
+    --bs-body-bg-rgb: 20, 31, 25;
+    --bs-body-color: #e2ebe5;
+    --bs-body-color-rgb: 226, 235, 229;
+    --bs-border-color: #2b3d33;
+    --bs-secondary-color: #94a99c;
+    --bs-secondary-bg: #1d2b23;
+    --bs-tertiary-bg: #18241d;
+}
+/* Vert et rouge de Bootstrap trop sombres sur fond sombre : éclaircis pour le texte seulement. */
+[data-bs-theme="dark"] .text-success { --bs-success-rgb: 79, 209, 143; }
+[data-bs-theme="dark"] .text-danger { --bs-danger-rgb: 255, 128, 128; }
+
+/* ---------- Base ---------- */
+/* Fond très légèrement teinté plutôt que blanc pur : les cartes et tableaux, eux
+   blancs, s'en détachent au lieu de flotter sans relief. */
+body {
+    background:
+        radial-gradient(1100px 340px at 50% -120px, var(--app-lueur), transparent 70%) no-repeat,
+        var(--app-fond);
+    color: var(--app-texte);
+}
+.app-carte {
+    background: var(--app-surface);
+    border: 1px solid var(--app-bordure);
+    border-radius: 16px;
+    box-shadow: var(--app-ombre);
+}
+/* Titres de page : plus d'air et un liseré vert qui rappelle la marque. */
+/* Carte-lien (bandeau du panier au catalogue) : texte normal plutôt que bleu de lien. */
+a.app-carte { color: var(--app-texte); }
+a.app-carte:hover { color: var(--app-texte); border-color: var(--app-teinte-vert-bord); }
+.app-titre {
+    font-weight: 700;
+    color: var(--app-titre);
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+}
+.app-titre::before {
+    content: "";
+    width: 5px;
+    height: 1.35em;
+    border-radius: 999px;
+    background: linear-gradient(180deg, #17a768, #0b7a45);
+    flex-shrink: 0;
+}
+.app-sous-titre {
+    color: var(--app-texte-2);
+    font-size: .92rem;
+    margin-top: -.15rem;
+}
+/* Bandeaux d'information plus doux que les alertes Bootstrap par défaut. */
+.alert {
+    border: 1px solid transparent;
+    border-radius: 14px;
+}
+.alert-success { background: var(--app-teinte-vert); border-color: var(--app-teinte-vert-bord); color: var(--app-texte-vert); }
+.alert-info { background: var(--app-teinte-bleu); border-color: var(--app-teinte-bleu-bord); color: var(--app-texte-bleu); }
+/* Tableaux : en-tête discret et lignes lisibles sans rayures marquées. */
+.table > thead th {
+    background: var(--app-entete-tableau);
+    color: var(--app-titre);
+    border-bottom: 1px solid var(--app-bordure-2);
+    font-weight: 600;
+    white-space: nowrap;
+}
+/* Les tableaux sont posés dans une boîte blanche : styler le conteneur générique
+   évite de reprendre chaque gabarit. On garde le défilement horizontal de Bootstrap,
+   indispensable sur téléphone. */
+.table-responsive {
+    background: var(--app-surface);
+    border: 1px solid var(--app-bordure);
+    border-radius: 16px;
+    box-shadow: var(--app-ombre);
+    padding: .5rem .5rem 0;
+}
+.table-responsive > .table { margin-bottom: .5rem; }
+/* Encarts de chiffres (tableau de bord, écran de paiement) et cartes-liens. */
+.border.rounded-3 {
+    background: var(--app-surface);
+    border-color: var(--app-bordure) !important;
+    border-radius: 16px !important;
+    box-shadow: var(--app-ombre);
+}
+.border.rounded-3 .fw-bold,
+.paiement-montant { font-variant-numeric: tabular-nums; }
+.card {
+    border-color: var(--app-bordure);
+    border-radius: 16px;
+    box-shadow: var(--app-ombre);
+    transition: transform .15s ease, box-shadow .15s ease;
+}
+a.card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--app-ombre-survol);
+    border-color: var(--app-teinte-vert-bord);
+}
+@media (hover: none) { a.card:hover { transform: none; } }
+
+/* Bootstrap rend btn-primary en bleu vif, qui jurait avec le vert de la marque.
+   Une seule source pour toute l'application : utiliser btn-primary, pas btn-success. */
+.btn-primary {
+    --bs-btn-bg: #0f9d58;
+    --bs-btn-border-color: #0f9d58;
+    --bs-btn-hover-bg: #0b7a45;
+    --bs-btn-hover-border-color: #0b7a45;
+    --bs-btn-active-bg: #0b7a45;
+    --bs-btn-active-border-color: #0b7a45;
+    --bs-btn-disabled-bg: #86bfa2;
+    --bs-btn-disabled-border-color: #86bfa2;
+}
+.btn-outline-primary {
+    --bs-btn-color: var(--app-vert-actif);
+    --bs-btn-border-color: #0f9d58;
+    --bs-btn-hover-bg: #0f9d58;
+    --bs-btn-hover-border-color: #0f9d58;
+    --bs-btn-active-bg: #0b7a45;
+    --bs-btn-active-border-color: #0b7a45;
+}
+
+/* ---------- Barre de navigation ---------- */
+.app-navbar {
+    background: var(--app-navbar);
+    box-shadow: 0 4px 14px -6px rgba(6, 60, 35, 0.45);
+}
+.app-navbar .navbar-brand {
+    font-weight: 700;
+    letter-spacing: .2px;
+}
+/* Titre long seulement quand il y a la place : il occupait deux lignes sur
+   téléphone et repoussait les liens du personnel (six menus) hors de l'écran. */
+.marque-longue { display: none; }
+@media (min-width: 1200px) {
+    .app-navbar:not(.nav-personnel) .marque-longue { display: inline; }
+    .app-navbar:not(.nav-personnel) .marque-courte { display: none; }
+}
+@media (min-width: 1600px) {
+    .nav-personnel .marque-longue { display: inline; }
+    .nav-personnel .marque-courte { display: none; }
+}
+/* Ordinateur : la barre du personnel (six menus, le nom, la déconnexion) débordait
+   de l'écran. Liens un peu resserrés, nom trop long abrégé. */
+@media (min-width: 1200px) {
+    .app-navbar #navPrincipale > div { gap: .35rem !important; }
+    .app-navbar .nav-link { padding: .4rem .65rem !important; }
+    .app-navbar .user-pill { max-width: 15rem; }
+}
+.app-navbar .user-pill .user-nom {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.app-navbar .nav-link {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    white-space: nowrap;
+    color: rgba(255, 255, 255, 0.92) !important;
+    padding: .4rem .8rem !important;
+    border-radius: 999px;
+    transition: background-color .18s ease, color .18s ease, transform .18s ease;
+}
+.app-navbar .dropdown {
+    display: flex;
+    align-items: center;
+}
+.app-navbar .nav-link:hover,
+.app-navbar .nav-link:focus {
+    background-color: rgba(255, 255, 255, 0.16);
+    color: #ffffff !important;
+    transform: translateY(-1px);
+}
+.app-navbar .user-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: .5rem;
+    color: var(--app-vert-actif);
+    font-weight: 700;
+    font-size: .875rem;
+    padding: .25rem .9rem .25rem .25rem;
+    border-radius: 999px;
+    background: var(--app-surface);
+    box-shadow: 0 3px 10px -3px rgba(6, 60, 35, 0.5);
+}
+.user-avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.8rem;
+    height: 1.8rem;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #0f9d58, #17a768);
+    color: #fff;
+    font-weight: 700;
+    font-size: .8rem;
+    flex-shrink: 0;
+}
+.app-navbar .user-role {
+    font-size: 1rem;
+    line-height: 1;
+}
+.app-navbar .btn-outline-light {
+    border-radius: 999px;
+    transition: background-color .18s ease, color .18s ease, transform .18s ease;
+}
+.app-navbar .btn-outline-light:hover {
+    background-color: #ffffff;
+    color: #0b7a45;
+    transform: translateY(-1px);
+}
+/* Bouton du menu sur téléphone : l'initiale du compte, plus parlante qu'un hamburger. */
+.app-navbar .entete-avatar {
+    border: 0;
+    padding: 0;
+    border-radius: 50%;
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, .55);
+}
+.app-navbar .entete-avatar:focus { box-shadow: 0 0 0 3px rgba(255, 255, 255, .8); }
+.app-navbar .entete-avatar .user-avatar {
+    width: 2.1rem;
+    height: 2.1rem;
+    font-size: .9rem;
+    background: #fff;
+    color: #0b7a45;
+}
+
+/* Sous 1 200 px (téléphone, tablette, petit portable) : en-tête compact, et le menu
+   devient un panneau qui monte du bas, au-dessus des onglets, là où se trouve le pouce. */
+@media (max-width: 1199.98px) {
+    .app-navbar {
+        padding-top: .45rem;
+        padding-bottom: .45rem;
+        margin-bottom: 1rem !important;
+    }
+    .app-navbar .navbar-brand { font-size: 1.12rem; }
+    .app-navbar .navbar-collapse {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: calc(var(--onglets-h) + env(safe-area-inset-bottom));
+        z-index: 1035;
+        max-height: calc(100vh - var(--onglets-h) - 3rem);
+        max-height: calc(100dvh - var(--onglets-h) - 3rem);
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        background: var(--app-surface);
+        color: var(--app-texte);
+        border: 1px solid var(--app-bordure);
+        border-bottom: 0;
+        border-radius: 20px 20px 0 0;
+        box-shadow: 0 -16px 36px -18px rgba(0, 0, 0, .45);
+    }
+    .app-navbar .navbar-collapse > div { padding: 1.4rem 1rem 1rem; }
+    .app-navbar .navbar-collapse::before {
+        content: "";
+        position: absolute;
+        top: .5rem;
+        left: 50%;
+        width: 40px;
+        height: 4px;
+        margin-left: -20px;
+        border-radius: 999px;
+        background: var(--app-bordure-2);
+    }
+    .app-navbar .navbar-collapse .nav-link {
+        width: 100%;
+        color: var(--app-texte) !important;
+        padding: .6rem .8rem !important;
+    }
+    .app-navbar .navbar-collapse .nav-link:hover,
+    .app-navbar .navbar-collapse .nav-link:focus {
+        background-color: var(--app-survol);
+        color: var(--app-texte) !important;
+        transform: none;
+    }
+    /* Les sous-menus (Statistiques, Catalogue) s'affichent déjà dépliés dans le panneau. */
+    .app-navbar .navbar-collapse .dropdown { display: block; width: 100%; }
+    .app-navbar .navbar-collapse .dropdown-toggle {
+        pointer-events: none;
+        font-size: .75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: .04em;
+        color: var(--app-texte-2) !important;
+        padding-bottom: .2rem !important;
+    }
+    .app-navbar .navbar-collapse .dropdown-toggle::after { display: none; }
+    .app-navbar .navbar-collapse .dropdown-menu {
+        display: block;
+        position: static !important;
+        transform: none !important;
+        border: 0;
+        box-shadow: none;
+        background: transparent;
+        padding: 0 0 .4rem;
+        margin: 0;
+    }
+    .app-navbar .navbar-collapse .dropdown-item {
+        border-radius: 10px;
+        padding: .55rem .8rem;
+        color: var(--app-texte);
+    }
+    .app-navbar .navbar-collapse .dropdown-item:hover,
+    .app-navbar .navbar-collapse .dropdown-item:focus { background: var(--app-survol); }
+    .app-navbar .navbar-collapse .user-pill {
+        order: -1;
+        width: fit-content;
+        margin-bottom: .35rem;
+        box-shadow: none;
+        border: 1px solid var(--app-bordure);
+    }
+    .app-navbar .navbar-collapse .btn-outline-light {
+        color: var(--app-texte-rouge);
+        border-color: var(--app-bordure-2);
+        width: 100%;
+        padding: .55rem;
+        margin-top: .35rem;
+    }
+    .app-navbar .navbar-collapse .btn-outline-light:hover { background: var(--app-teinte-rouge); color: var(--app-texte-rouge); }
+    /* Liens déjà présents dans les onglets du bas : inutile de les répéter. */
+    .app-navbar .doublon-onglets { display: none !important; }
+    /* Voile derrière le panneau ; un toucher dessus le referme (voir app.js). */
+    .app-navbar:has(.navbar-collapse.show, .navbar-collapse.collapsing)::after {
+        content: "";
+        position: fixed;
+        inset: 0;
+        z-index: 1034;
+        background: rgba(8, 20, 14, .38);
+    }
+}
+
+/* ---------- Onglets en bas (sous 1 200 px) ---------- */
+.barre-onglets { display: none; }
+@media (max-width: 1199.98px) {
+    body.avec-onglets { padding-bottom: calc(var(--onglets-h) + 1.25rem + env(safe-area-inset-bottom)); }
+    .barre-onglets {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 1036;
+        display: flex;
+        height: calc(var(--onglets-h) + env(safe-area-inset-bottom));
+        padding-bottom: env(safe-area-inset-bottom);
+        background: var(--app-surface);
+        border-top: 1px solid var(--app-bordure);
+        box-shadow: 0 -6px 18px -14px rgba(6, 60, 35, .45);
+        /* Reste immobile pendant le fondu entre deux pages. */
+        view-transition-name: onglets;
+    }
+}
+.barre-onglets { justify-content: center; }
+.onglet {
+    flex: 1;
+    min-width: 0;
+    max-width: 170px; /* tablette, petit portable : onglets groupés au centre */
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    padding: .3rem 0 0;
+    font-size: .72rem;
+    line-height: 1.1;
+    color: var(--app-texte-2);
+    text-decoration: none;
+    background: none;
+    border: 0;
+    -webkit-tap-highlight-color: transparent;
+}
+.onglet:hover { color: var(--app-texte); }
+.onglet-icone {
+    font-size: 1.3rem;
+    line-height: 1;
+    filter: grayscale(1);
+    opacity: .7;
+    transition: transform .2s ease, filter .2s ease, opacity .2s ease;
+}
+.onglet:active .onglet-icone { transform: scale(.86); }
+.onglet[aria-current="page"],
+.onglet[aria-expanded="true"],
+.onglet.section-active {
+    color: var(--app-vert-actif);
+    font-weight: 600;
+}
+.onglet[aria-current="page"] .onglet-icone,
+.onglet[aria-expanded="true"] .onglet-icone,
+.onglet.section-active .onglet-icone {
+    filter: none;
+    opacity: 1;
+    transform: translateY(-1px);
+}
+.onglet[aria-current="page"]::before,
+.onglet.section-active::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 50%;
+    width: 32px;
+    height: 3px;
+    margin-left: -16px;
+    border-radius: 0 0 3px 3px;
+    background: var(--app-vert);
+}
+.onglet .user-avatar { width: 1.45rem; height: 1.45rem; font-size: .72rem; }
+.onglet-badge {
+    position: absolute;
+    top: 3px;
+    left: calc(50% + 5px);
+    font-size: .62rem;
+    padding: .25em .45em;
+    border-radius: 999px;
+}
+
+/* ---------- Barre de chargement ---------- */
+/* Sur le réseau lent des FOSA, un toucher restait sans réponse visible pendant
+   plusieurs secondes. Pilotée par app.js. */
+.barre-chargement {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 1100;
+    width: 100%;
+    height: 3px;
+    pointer-events: none;
+    transform: scaleX(0);
+    transform-origin: 0 50%;
+    opacity: 0;
+    background: linear-gradient(90deg, #5fd68f, #b8f5cf);
+    box-shadow: 0 1px 4px rgba(6, 60, 35, .45);
+}
+.barre-chargement.en-cours {
+    opacity: 1;
+    transform: scaleX(.85);
+    transition: transform 9s cubic-bezier(.05, .8, .2, 1), opacity .15s;
+}
+.barre-chargement.fini {
+    opacity: 0;
+    transform: scaleX(1);
+    transition: transform .2s ease, opacity .3s ease .2s;
+}
+
+/* ---------- Messages (toasts) ---------- */
+.zone-toasts {
+    position: fixed;
+    z-index: 1090;
+    top: 1rem;
+    right: 1rem;
+    width: min(420px, calc(100vw - 2rem));
+    display: flex;
+    flex-direction: column;
+    gap: .5rem;
+    pointer-events: none;
+}
+@media (max-width: 1199.98px) {
+    .zone-toasts {
+        top: auto;
+        left: 1rem;
+        right: 1rem;
+        width: auto;
+        bottom: 1rem;
+    }
+    body.avec-onglets .zone-toasts { bottom: calc(var(--onglets-h) + .75rem + env(safe-area-inset-bottom)); }
+}
+.toast-msg {
+    pointer-events: auto;
+    display: flex;
+    align-items: flex-start;
+    gap: .6rem;
+    padding: .7rem .6rem .7rem .9rem;
+    border-radius: 14px;
+    background: #12321f;
+    color: #fff;
+    font-size: .92rem;
+    box-shadow: 0 14px 30px -12px rgba(0, 0, 0, .5);
+    animation: toast-entree .32s cubic-bezier(.2, .8, .3, 1) both;
+}
+.toast-msg[data-niveau="info"] { background: #14456e; }
+.toast-msg[data-niveau="warning"] { background: #7a4a00; }
+.toast-msg[data-niveau="danger"] { background: #8a1f17; }
+[data-bs-theme="dark"] .toast-msg { box-shadow: 0 0 0 1px rgba(255, 255, 255, .1), 0 14px 30px -12px rgba(0, 0, 0, .8); }
+.toast-msg.sortie { animation: toast-sortie .25s ease-in both; }
+.toast-icone { line-height: 1.35; }
+.toast-texte { flex: 1; line-height: 1.35; overflow-wrap: anywhere; }
+.toast-fermer {
+    border: 0;
+    background: none;
+    color: inherit;
+    opacity: .7;
+    font-size: 1.25rem;
+    line-height: 1;
+    padding: 0 .35rem;
+}
+.toast-fermer:hover { opacity: 1; }
+@keyframes toast-entree { from { opacity: 0; transform: translateY(12px) scale(.98); } }
+@keyframes toast-sortie { to { opacity: 0; transform: translateY(8px) scale(.98); } }
+
+/* ---------- Transitions entre pages ---------- */
+/* Fondu doux d'une page à l'autre, sans JavaScript. Les navigateurs qui ne le
+   connaissent pas changent de page comme avant. */
+@view-transition { navigation: auto; }
+::view-transition-old(root) { animation: 120ms ease-out both vt-sortie; }
+::view-transition-new(root) { animation: 220ms ease-out both vt-entree; }
+@keyframes vt-sortie { to { opacity: 0; } }
+@keyframes vt-entree { from { opacity: 0; transform: translateY(6px); } }
+
+/* ---------- Tableau de bord : encarts qui apparaissent l'un après l'autre ---------- */
+.row > .col > .border.rounded-3 { animation: apparition .45s cubic-bezier(.2, .7, .3, 1) both; }
+.row > .col:nth-child(2) > .border.rounded-3 { animation-delay: 50ms; }
+.row > .col:nth-child(3) > .border.rounded-3 { animation-delay: 100ms; }
+.row > .col:nth-child(4) > .border.rounded-3 { animation-delay: 150ms; }
+.row > .col:nth-child(5) > .border.rounded-3 { animation-delay: 200ms; }
+.row > .col:nth-child(n+6) > .border.rounded-3 { animation-delay: 250ms; }
+@keyframes apparition { from { opacity: 0; transform: translateY(8px); } }
+
+/* ---------- Catalogue ---------- */
+/* minmax(0, …) : avec un simple 1fr, un nom de produit sans espace élargit la grille au-delà de l'écran. */
+.catalogue-layout {
+    display: grid;
+    grid-template-columns: 260px minmax(0, 1fr);
+    gap: 1.25rem;
+    align-items: start;
+}
+@media (max-width: 767px) {
+    .catalogue-layout { grid-template-columns: minmax(0, 1fr); }
+}
+/* Bandeau d'en-tête de page (catalogue) : dégradé vert de la marque et formes
+   douces dessinées en CSS, aucune image. */
+.app-bandeau {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+    border-radius: 22px;
+    padding: 1.6rem 1.75rem 1.5rem;
+    color: #fff;
+    background:
+        radial-gradient(circle at 88% -30%, rgba(255, 255, 255, .24) 0, transparent 42%),
+        radial-gradient(circle at 6% 130%, rgba(4, 60, 34, .55) 0, transparent 48%),
+        linear-gradient(130deg, #0b7a45 0%, #0f9d58 52%, #2fbf76 100%);
+    box-shadow: 0 20px 40px -26px rgba(6, 60, 35, .75);
+    animation: apparition .45s cubic-bezier(.2, .7, .3, 1) both;
+}
+[data-bs-theme="dark"] .app-bandeau {
+    background:
+        radial-gradient(circle at 88% -30%, rgba(255, 255, 255, .12) 0, transparent 42%),
+        linear-gradient(130deg, #07402a 0%, #0a5c37 55%, #0f7d4b 100%);
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, .06), 0 20px 40px -26px rgba(0, 0, 0, .8);
+}
+.app-bandeau::after {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    right: -60px;
+    bottom: -90px;
+    width: 260px;
+    height: 260px;
+    border-radius: 50%;
+    border: 36px solid rgba(255, 255, 255, .07);
+}
+.app-bandeau-titre {
+    font-size: 1.55rem;
+    font-weight: 800;
+    letter-spacing: -.01em;
+    margin: 0 0 .25rem;
+}
+.app-bandeau-texte {
+    color: rgba(255, 255, 255, .86);
+    font-size: .92rem;
+    max-width: 62rem;
+    margin: 0 0 1rem;
+}
+.app-bandeau .recherche-champ .form-control {
+    background: #fff;
+    color: #17251d;
+    border-color: transparent;
+    box-shadow: 0 10px 24px -14px rgba(0, 0, 0, .55);
+}
+.app-bandeau .recherche-champ .form-control::placeholder { color: #7c9688; }
+.app-bandeau .recherche-champ .form-control:focus { box-shadow: 0 0 0 .25rem rgba(255, 255, 255, .35), 0 10px 24px -14px rgba(0, 0, 0, .55); }
+.app-bandeau .recherche-raccourci { background: #f2f7f4; color: #6c8a79; border-color: #d8e7de; }
+/* Formulaires dans le bandeau (dates du tableau de bord) : champs blancs, libellés clairs. */
+.app-bandeau .form-label { color: rgba(255, 255, 255, .9); font-size: .85rem; margin-bottom: .25rem; }
+.app-bandeau .form-control,
+.app-bandeau .form-select {
+    background-color: #fff;
+    color: #17251d;
+    border-color: transparent;
+    color-scheme: light;
+}
+.app-bandeau .btn-light { color: #0b7a45; }
+@media (max-width: 767px) {
+    .app-bandeau { padding: 1.1rem 1rem 1rem; border-radius: 18px; }
+    .app-bandeau-titre { font-size: 1.25rem; }
+    .app-bandeau-texte { font-size: .85rem; margin-bottom: .8rem; }
+}
+
+/* Le navigateur ne calcule que les fiches visibles à l'écran : avec 1 200 fiches,
+   l'affichage du catalogue ramait sur les téléphones modestes. La taille indiquée
+   est une estimation, remplacée par la vraie dès qu'une fiche a été affichée. */
+.catalogue-grille > .col {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 140px; /* fiche FOSA mesurée : 120 à 160 px sur téléphone */
+}
+/* Barre de recherche : loupe intégrée, champ arrondi, pleine largeur sur
+   téléphone où l'écran ne permet pas de mettre le bouton à côté. */
+.recherche-barre {
+    display: flex;
+    gap: .5rem;
+    flex-wrap: wrap;
+    align-items: center;
+}
+.recherche-champ {
+    position: relative;
+    flex: 1 1 260px;
+    max-width: 440px;
+}
+.recherche-champ .form-control {
+    padding-left: 2.4rem;
+    border-radius: 999px;
+    border-color: var(--app-bordure-2);
+    height: 44px; /* cible tactile confortable */
+}
+.recherche-champ .form-control:focus {
+    border-color: #17a768;
+    box-shadow: 0 0 0 .2rem rgba(23, 167, 104, .16);
+}
+.recherche-icone {
+    position: absolute;
+    left: .85rem;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: .95rem;
+    pointer-events: none;
+    opacity: .65;
+}
+.recherche-barre .btn { border-radius: 999px; height: 44px; padding-inline: 1.1rem; }
+/* Recherche instantanée active (app.js) : le bouton ne sert plus, il libère la place. */
+.recherche-barre.instantanee .btn-rechercher { display: none; }
+@media (max-width: 575px) {
+    .recherche-champ { flex-basis: 100%; max-width: none; }
+    .recherche-barre .btn { flex: 1; }
+}
+
+.rayons-panel {
+    background: var(--app-surface);
+    border: 1px solid var(--app-bordure);
+    border-radius: 16px;
+    padding: .75rem;
+    position: sticky;
+    top: .75rem;
+    box-shadow: var(--app-ombre);
+}
+/* Téléphone : les rayons deviennent une rangée de pastilles qui défile
+   horizontalement, au lieu d'une colonne qui repousserait les produits très bas. */
+@media (max-width: 767px) {
+    .rayons-panel {
+        position: static;
+        display: flex;
+        overflow-x: auto;
+        gap: .5rem;
+        padding: .55rem;
+        scroll-snap-type: x proximity;
+        -webkit-overflow-scrolling: touch;
+    }
+    .rayons-panel::-webkit-scrollbar { height: 4px; }
+    .rayons-panel::-webkit-scrollbar-thumb { background: var(--app-bordure-champ); border-radius: 999px; }
+    .rayon-lien {
+        scroll-snap-align: start;
+        border: 1px solid var(--app-bordure);
+        background: var(--app-champ);
+    }
+    .rayon-lien.active { border-color: #0f9d58; }
+}
+.rayons-panel .rayon-titre {
+    font-size: .75rem;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--app-texte-2);
+    font-weight: 700;
+    padding: .35rem .6rem .5rem;
+}
+@media (max-width: 767px) { .rayons-panel .rayon-titre { display: none; } }
+.rayon-lien {
+    display: flex;
+    align-items: center;
+    gap: .55rem;
+    padding: .5rem .6rem;
+    border-radius: 10px;
+    color: var(--app-texte);
+    text-decoration: none;
+    font-size: .92rem;
+    white-space: nowrap;
+    transition: background-color .12s ease;
+}
+.rayon-lien:hover { background: var(--app-survol); color: var(--app-texte); }
+.rayon-lien.active {
+    background: #0f9d58;
+    color: #fff;
+    font-weight: 600;
+}
+.rayon-lien .rayon-icone { font-size: 1.1rem; line-height: 1; }
+.rayon-lien .rayon-count {
+    margin-left: auto;
+    font-size: .75rem;
+    opacity: .75;
+}
+@media (max-width: 767px) { .rayon-lien .rayon-count { display: none; } }
+
+.produit-card {
+    border: 1px solid var(--app-bordure);
+    border-radius: 16px;
+    padding: 1rem;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: .4rem;
+    background: var(--app-surface);
+    box-shadow: var(--app-ombre);
+    transition: box-shadow .15s ease, border-color .15s ease, transform .15s ease;
+    scroll-margin-top: .75rem; /* retour sur la fiche après un ajout sans JavaScript */
+}
+.produit-card:hover {
+    box-shadow: var(--app-ombre-survol);
+    border-color: var(--app-teinte-vert-bord);
+    transform: translateY(-2px);
+}
+/* Pas d'effet de survol au doigt : sur téléphone il reste « collé » après le tap
+   et donne l'impression que la carte est sélectionnée. */
+@media (hover: none) {
+    .produit-card:hover { transform: none; }
+}
+.produit-card .produit-rayon-tag {
+    font-size: .72rem;
+    color: var(--app-texte-2);
+    display: inline-flex;
+    align-items: center;
+    gap: .3rem;
+}
+.produit-card .produit-nom {
+    font-weight: 600;
+    color: var(--app-texte);
+    min-height: 2.6em;
+    overflow-wrap: anywhere;
+}
+.produit-card .produit-meta {
+    font-size: .85rem;
+    color: var(--app-texte-2);
+}
+.produit-card .produit-prix {
+    font-weight: 700;
+    color: var(--app-vert-actif);
+    font-size: 1.05rem;
+}
+.produit-card form { margin-top: auto; }
+
+/* Bouton d'ajout façon marchand en ligne : pilule, léger dégradé, ombre portée et
+   enfoncement au clic. Volontairement en bleu et non dans le vert de la marque,
+   pour qu'il tranche comme action principale de la carte (confirmé le 2026-10-22). */
+.btn-ajouter {
+    background: linear-gradient(180deg, #3d9bee 0%, #1a73c7 100%);
+    border: 1px solid #1663ad;
+    color: #fff;
+    font-weight: 600;
+    border-radius: 999px;
+    padding: .42rem 1.1rem;
+    box-shadow: 0 2px 6px -1px rgba(16, 74, 128, .45);
+    transition: filter .15s ease, box-shadow .15s ease, transform .06s ease;
+}
+.btn-ajouter:hover {
+    filter: brightness(1.07);
+    color: #fff;
+    box-shadow: 0 4px 10px -2px rgba(16, 74, 128, .55);
+}
+.btn-ajouter:focus-visible {
+    outline: 3px solid rgba(61, 155, 238, .45);
+    outline-offset: 1px;
+    color: #fff;
+}
+.btn-ajouter:active {
+    transform: translateY(1px);
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, .22);
+}
+.btn-ajouter:disabled {
+    background: #b9c6d2;
+    border-color: #a8b6c4;
+    box-shadow: none;
+}
+/* Téléphone : hauteur de cible tactile confortable (44 px recommandés). */
+@media (max-width: 767px) {
+    .btn-ajouter, .produit-card .quantite-input { height: 44px; }
+    .produit-card { padding: .9rem; }
+}
+/* Champ quantité assorti : même hauteur, mêmes angles arrondis. */
+.produit-card .quantite-input {
+    max-width: 78px;
+    border-radius: 999px;
+    text-align: center;
+    font-weight: 600;
+    border-color: var(--app-bordure-champ);
+}
+.produit-card .quantite-input:focus {
+    border-color: #3d9bee;
+    box-shadow: 0 0 0 .2rem rgba(61, 155, 238, .2);
+}
+.produit-au-panier {
+    font-size: .8rem;
+    font-weight: 600;
+    color: var(--app-texte-vert);
+    background: var(--app-teinte-vert);
+    border-radius: 8px;
+    padding: .25rem .5rem;
+    align-self: flex-start;
+}
+/* Liseré vert sur les produits déjà au panier : repérable d'un coup d'oeil en
+   faisant défiler une centaine de cartes. */
+.produit-card.au-panier {
+    border-color: #0f9d58;
+    box-shadow: inset 3px 0 0 #0f9d58;
+}
+
+/* ---------- Panier ---------- */
+.quantite-panier {
+    width: 78px;
+    border-radius: 999px;
+    text-align: center;
+    font-weight: 600;
+    border-color: var(--app-bordure-champ);
+}
+.quantite-panier:focus {
+    border-color: #17a768;
+    box-shadow: 0 0 0 .2rem rgba(23, 167, 104, .18);
+}
+@media (max-width: 767px) {
+    .quantite-panier { height: 40px; }
+}
+
+/* ---------- Paiement ---------- */
+/* Une « caisse » étroite et centrée, comme sur les sites de paiement en ligne,
+   lisible d'une main sur téléphone. */
+.paiement-caisse { max-width: 540px; margin: 0 auto; }
+.paiement-etapes {
+    display: flex;
+    list-style: none;
+    padding: 0;
+    margin: 0 0 1rem;
+    counter-reset: etape;
+}
+.paiement-etapes li {
+    flex: 1;
+    position: relative;
+    padding-top: 2.1rem;
+    text-align: center;
+    font-size: .8rem;
+    color: var(--app-texte-2);
+}
+.paiement-etapes li::before {
+    counter-increment: etape;
+    content: counter(etape);
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 1.7rem;
+    height: 1.7rem;
+    border-radius: 50%;
+    background: var(--app-bordure);
+    color: var(--app-texte-2);
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.paiement-etapes li.faite::before { content: "✓"; background: #0f9d58; color: #fff; }
+.paiement-etapes li.active { color: var(--app-titre); font-weight: 600; }
+.paiement-etapes li.active::before { background: #0f9d58; color: #fff; box-shadow: 0 0 0 4px var(--app-teinte-vert-bord); }
+.paiement-recap {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: .5rem 1rem;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px dashed var(--app-bordure-2);
+}
+.paiement-montant {
+    font-size: 1.9rem;
+    font-weight: 800;
+    color: var(--app-titre);
+    line-height: 1.15;
+    white-space: nowrap;
+}
+.paiement-montant small { font-size: .9rem; font-weight: 600; color: var(--app-texte-2); }
+.marque-om { display: inline-flex; align-items: center; gap: .45rem; font-weight: 700; color: var(--app-texte); }
+.marque-om::before {
+    content: "";
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 6px;
+    background: #ff7900;
+    flex-shrink: 0;
+}
+.choix-reglement { color: inherit; text-decoration: none; background: var(--app-surface); cursor: pointer; }
+.choix-reglement:hover { color: inherit; transform: translateY(-2px); border-color: var(--app-teinte-vert-bord); }
+@media (hover: none) { .choix-reglement:hover { transform: none; } }
+.choix-icone { font-size: 1.8rem; line-height: 1; }
+.choix-fleche { font-size: 1.6rem; color: var(--app-texte-2); }
+.etapes-telephone { padding-left: 1.2rem; margin-bottom: 1rem; text-align: left; }
+.etapes-telephone li { margin-bottom: .35rem; }
+.mode-test {
+    background: #fff4e5;
+    border: 1px dashed #f0a24a;
+    color: #7a4300;
+    border-radius: 12px;
+    padding: .6rem .9rem;
+    font-size: .9rem;
+}
+[data-bs-theme="dark"] .mode-test { background: #33230d; color: #ffc98a; border-color: #8a5a1c; }
+.paiement-icone {
+    width: 4rem;
+    height: 4rem;
+    margin: 0 auto .75rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    font-weight: 700;
+}
+.paiement-icone-succes { background: var(--app-teinte-vert); color: var(--app-vert-actif); }
+.paiement-icone-echec { background: var(--app-teinte-rouge); color: var(--app-texte-rouge); }
+.paiement-details {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: .4rem 1rem;
+    margin: 0 0 1.25rem;
+    font-size: .92rem;
+    text-align: left;
+}
+.paiement-details dt { color: var(--app-texte-2); font-weight: 500; }
+.paiement-details dd { margin: 0; text-align: right; font-weight: 600; overflow-wrap: anywhere; }
+/* Page Orange Money simulée (mode test) : bandeau aux couleurs d'Orange, pour qu'on
+   voie qu'on a quitté l'application comme en vrai. */
+.page-orange-test { overflow: hidden; }
+.page-orange-test-bandeau {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: .7rem 1.25rem;
+    background: #1a1a1a;
+    color: #fff;
+}
+.page-orange-test-bandeau .marque-om { color: #fff; }
+.btn-orange-test {
+    --bs-btn-bg: #ff7900;
+    --bs-btn-border-color: #ff7900;
+    --bs-btn-color: #000;
+    --bs-btn-hover-bg: #e56d00;
+    --bs-btn-hover-border-color: #e56d00;
+    --bs-btn-hover-color: #000;
+    --bs-btn-active-bg: #cc6100;
+    --bs-btn-active-border-color: #cc6100;
+    font-weight: 700;
+}
+
+/* ---------- Page de connexion ---------- */
+.page-connexion {
+    min-height: 100vh;
+    background:
+        radial-gradient(circle at 12% 15%, rgba(255, 255, 255, 0.16) 0, transparent 38%),
+        radial-gradient(circle at 88% 12%, rgba(255, 255, 255, 0.12) 0, transparent 42%),
+        radial-gradient(circle at 8% 92%, rgba(6, 68, 40, 0.55) 0, transparent 45%),
+        radial-gradient(circle at 95% 88%, rgba(6, 95, 55, 0.5) 0, transparent 45%),
+        linear-gradient(160deg, #0b7a45 0%, #0f9d58 45%, #34c77b 100%);
+}
+[data-bs-theme="dark"] .page-connexion {
+    background:
+        radial-gradient(circle at 12% 15%, rgba(255, 255, 255, 0.08) 0, transparent 38%),
+        radial-gradient(circle at 95% 88%, rgba(6, 95, 55, 0.5) 0, transparent 45%),
+        linear-gradient(160deg, #06331f 0%, #0a5232 50%, #0f7d4b 100%);
+}
+.login-shell {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2.5rem 1rem;
+}
+.login-card {
+    width: 100%;
+    max-width: 400px;
+    background: var(--app-surface);
+    border-radius: 28px;
+    padding: 2.25rem 2rem 2rem;
+    box-shadow: 0 30px 60px -20px rgba(6, 60, 35, 0.55);
+    position: relative;
+    overflow: hidden;
+    animation: apparition .45s cubic-bezier(.2, .7, .3, 1) both;
+}
+.login-card::before {
+    content: "";
+    position: absolute;
+    top: -70px;
+    right: -70px;
+    width: 160px;
+    height: 160px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(52, 199, 123, 0.25), rgba(52, 199, 123, 0));
+}
+/* Le logo garde son fond blanc dans les deux modes : c'est une plaque, pas un fond. */
+.login-logo {
+    width: 132px;
+    height: 82px;
+    border-radius: 20px;
+    margin: 0 auto 1.1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #ffffff;
+    box-shadow: 0 10px 22px -10px rgba(11, 61, 36, 0.35);
+    border: 1px solid #eef4f0;
+}
+.login-logo svg { width: 112px; height: 62px; }
+.login-brand {
+    text-align: center;
+    margin-bottom: 1.75rem;
+}
+.login-brand h1 {
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: var(--app-titre);
+    margin-bottom: 0.15rem;
+}
+.login-brand p {
+    font-size: 0.85rem;
+    color: var(--app-texte-2);
+    margin-bottom: 0;
+}
+.field-group { margin-bottom: 1.1rem; }
+.field-group label {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--app-titre);
+    margin-bottom: 0.35rem;
+    display: block;
+}
+.field-icon-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+.field-icon-wrap svg {
+    position: absolute;
+    left: 14px;
+    width: 18px;
+    height: 18px;
+    color: #59a97e;
+}
+.field-icon-wrap input {
+    width: 100%;
+    padding: 0.7rem 0.9rem 0.7rem 2.6rem;
+    border: 1.5px solid var(--app-bordure);
+    border-radius: 14px;
+    background: var(--app-champ);
+    font-size: 0.95rem;
+    color: var(--app-titre);
+    transition: border-color .15s ease, box-shadow .15s ease;
+}
+.field-icon-wrap input:focus {
+    outline: none;
+    border-color: #34c77b;
+    box-shadow: 0 0 0 3px rgba(52, 199, 123, 0.18);
+    background: var(--app-surface);
+}
+.field-icon-wrap.password-wrap input { padding-right: 2.6rem; }
+.toggle-password {
+    position: absolute;
+    right: 12px;
+    background: none;
+    border: none;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    color: #59a97e;
+    cursor: pointer;
+}
+.toggle-password svg {
+    position: static;
+    width: 19px;
+    height: 19px;
+}
+.btn-login {
+    width: 100%;
+    border: none;
+    border-radius: 999px;
+    padding: 0.75rem 1rem;
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: #ffffff;
+    background: linear-gradient(90deg, #0f9d58, #34c77b);
+    box-shadow: 0 14px 24px -10px rgba(15, 157, 88, 0.65);
+    transition: transform .12s ease, box-shadow .12s ease;
+}
+.btn-login:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 18px 28px -10px rgba(15, 157, 88, 0.7);
+    color: #ffffff;
+}
+.btn-login:active { transform: translateY(0); }
+.login-footnote {
+    text-align: center;
+    font-size: 0.8rem;
+    color: var(--app-texte-2);
+    margin-top: 1.4rem;
+}
+.login-alert {
+    background: var(--app-teinte-rouge);
+    color: var(--app-texte-rouge);
+    border: 1px solid #f6c8c3;
+    border-radius: 12px;
+    padding: 0.65rem 0.9rem;
+    font-size: 0.85rem;
+    margin-bottom: 1.1rem;
+}
+[data-bs-theme="dark"] .login-alert { border-color: #5c2420; }
+
+/* ---------- Ordinateur : relief et mouvement ---------- */
+/* Barre du haut toujours visible, page en cours surlignée. Sa hauteur ne change pas
+   au défilement (seule l'ombre se renforce) : un changement de hauteur ferait sauter
+   la page. */
+@media (min-width: 1200px) {
+    .app-navbar {
+        position: sticky;
+        top: 0;
+        z-index: 1030;
+        transition: box-shadow .25s ease;
+    }
+    .entete-reduit .app-navbar { box-shadow: 0 10px 28px -12px rgba(6, 40, 24, .6); }
+    .app-navbar .nav-link[aria-current="page"],
+    .app-navbar .nav-link.actif {
+        background-color: rgba(255, 255, 255, .2);
+        color: #fff !important;
+        box-shadow: inset 0 -2px 0 #b8f5cf;
+    }
+    .rayons-panel { top: 5.25rem; }
+    .produit-card { scroll-margin-top: 5.25rem; }
+}
+
+/* Lignes de tableau qui s'éclairent au survol. */
+.table-responsive .table > tbody > tr > * { transition: background-color .15s ease; }
+.table-responsive .table > tbody > tr:hover > * { --bs-table-bg-state: var(--app-survol); }
+
+/* Boutons principaux : léger relief, se soulèvent au survol. */
+.btn-primary {
+    background-image: linear-gradient(180deg, rgba(255, 255, 255, .14), rgba(255, 255, 255, 0));
+    box-shadow: 0 6px 14px -8px rgba(15, 157, 88, .75);
+    transition: transform .12s ease, box-shadow .12s ease, background-color .15s ease;
+}
+.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 10px 18px -8px rgba(15, 157, 88, .8); }
+.btn-primary:active { transform: translateY(0); }
+
+/* Encarts de chiffres : filet vert en haut. */
+.row > .col > .border.rounded-3 { position: relative; overflow: hidden; }
+.row > .col > .border.rounded-3::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #0f9d58, #5fd68f);
+}
+
+/* Catalogue : étiquette de rayon en pastille, filet vert qui se déploie au survol. */
+.produit-card { position: relative; }
+.produit-card .produit-rayon-tag {
+    background: var(--app-teinte-vert);
+    color: var(--app-texte-vert);
+    font-weight: 600;
+    padding: .12rem .55rem;
+    border-radius: 999px;
+}
+.produit-card::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 18px;
+    right: 18px;
+    height: 3px;
+    border-radius: 0 0 3px 3px;
+    background: linear-gradient(90deg, #0f9d58, #5fd68f);
+    transform: scaleX(0);
+    transition: transform .25s ease;
+}
+.produit-card:hover::before { transform: scaleX(1); }
+.rayon-lien { transition: background-color .12s ease, padding-left .15s ease; }
+@media (hover: hover) and (min-width: 768px) {
+    .rayon-lien:not(.active):hover { padding-left: .9rem; }
+}
+
+/* Recherche mise en avant : plus grande, ombre douce, halo vert au focus.
+   Sur ordinateur, la touche « / » y mène directement (js/app.js). */
+.recherche-champ .form-control {
+    box-shadow: var(--app-ombre);
+    transition: border-color .15s ease, box-shadow .2s ease;
+}
+.recherche-champ .form-control:focus { box-shadow: 0 0 0 .25rem rgba(23, 167, 104, .18), var(--app-ombre); }
+.recherche-raccourci { display: none; }
+@media (hover: hover) and (min-width: 992px) {
+    .recherche-champ { max-width: 520px; }
+    .recherche-champ .form-control { height: 48px; padding-right: 2.6rem; }
+    .recherche-raccourci {
+        display: block;
+        position: absolute;
+        right: .8rem;
+        top: 50%;
+        transform: translateY(-50%);
+        padding: .05rem .45rem;
+        font-size: .75rem;
+        color: var(--app-texte-2);
+        background: var(--app-champ);
+        border: 1px solid var(--app-bordure-2);
+        border-radius: 6px;
+        box-shadow: none;
+        pointer-events: none;
+    }
+    .recherche-champ .form-control:focus ~ .recherche-raccourci { opacity: 0; }
+}
+
+/* Fiches et cartes qui apparaissent en glissant au fil du défilement. Uniquement
+   en CSS, dans les navigateurs qui le savent (Chrome, Edge) ; les autres
+   affichent les fiches directement. */
+@supports (animation-timeline: view()) {
+    @media (prefers-reduced-motion: no-preference) {
+        .catalogue-grille > .col > .produit-card,
+        .row > .col > a.card {
+            animation: apparition-defilement linear backwards;
+            animation-timeline: view();
+            animation-range: entry 0% entry 35%;
+        }
+    }
+}
+@keyframes apparition-defilement { from { opacity: 0; transform: translateY(18px) scale(.98); } }
+
+/* ---------- Petits écrans ---------- */
+/* Écrans de 320 px : le titre, insécable par défaut, dépassait de l'écran. */
+@media (max-width: 359.98px) {
+    .app-navbar .navbar-brand { white-space: normal; }
+}
+
+/* ---------- Impression ---------- */
+@media print {
+    .barre-onglets, .zone-toasts, .barre-chargement, .app-navbar { display: none !important; }
+    body.avec-onglets { padding-bottom: 0; }
+}
+
+/* ---------- Animations réduites ---------- */
+/* Réglage « réduire les animations » du téléphone : tout s'affiche directement. */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: .01ms !important;
+        animation-delay: 0s !important;
+        transition-duration: .01ms !important;
+    }
+    @view-transition { navigation: none; }
+}

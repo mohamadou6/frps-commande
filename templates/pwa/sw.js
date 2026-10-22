@@ -3,7 +3,7 @@
 // URL hachées réelles, et ce fichier change dès qu'un fichier statique change —
 // ce qui suffit au navigateur pour détecter une mise à jour.
 
-const VERSION = "v3";
+const VERSION = "v6"; // v5 : charte sortie dans css/app.css et js/app.js ; v6 : bandeaux et relief sur ordinateur
 const CACHE_COQUILLE = "frps-coquille-" + VERSION; // ressources fixes de l'app
 const CACHE_PAGES = "frps-pages-" + VERSION; // pages HTML déjà consultées
 const PAGE_HORS_LIGNE = "{% url 'hors_ligne' %}";
@@ -20,6 +20,8 @@ const RESSOURCES_COQUILLE = [
     PAGE_HORS_LIGNE,
     "{% static 'vendor/bootstrap/bootstrap.min.css' %}",
     "{% static 'vendor/bootstrap/bootstrap.bundle.min.js' %}",
+    "{% static 'css/app.css' %}",
+    "{% static 'js/app.js' %}",
     "{% static 'img/favicon.svg' %}",
     "{% static 'img/icon-192.png' %}",
     "{% static 'img/icon-512.png' %}",

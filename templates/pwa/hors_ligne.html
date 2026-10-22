@@ -3,7 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#0f9d58">
+    <meta name="color-scheme" content="light dark">
+    <meta name="theme-color" content="#0f9d58" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#0a5232" media="(prefers-color-scheme: dark)">
     <link rel="icon" type="image/svg+xml" href="{% static 'img/favicon.svg' %}">
     <title>Hors connexion - FRPS Nord en Ligne</title>
     <style>
@@ -38,6 +40,14 @@
             padding: .7rem 1.4rem;
             font-size: 1rem;
             cursor: pointer;
+        }
+        /* Mode sombre du téléphone. Page autonome (servie hors ligne par le service
+           worker) : elle ne charge pas css/app.css, d'où ces quelques règles ici. */
+        @media (prefers-color-scheme: dark) {
+            body { background: linear-gradient(160deg, #06331f 0%, #0a5232 50%, #0f7d4b 100%); }
+            .carte { background: #141f19; }
+            h1 { color: #4fd18f; }
+            p { color: #c9d6ce; }
         }
     </style>
 </head>

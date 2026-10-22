@@ -145,6 +145,10 @@ LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'catalogue:liste'
 LOGOUT_REDIRECT_URL = 'login'
 
+# base.html affiche chaque message en `alert-<tag>` : sans cette correspondance, une
+# erreur sortait en `alert-error`, classe inconnue de Bootstrap, donc sans couleur.
+MESSAGE_TAGS = {40: 'danger'}  # 40 = django.contrib.messages.ERROR
+
 
 # --- Intégrations externes (voir .env.example) ---
 
