@@ -561,6 +561,74 @@ class CommandeHorsConnexionTests(TestCase):
         self.assertEqual(len(mail.outbox), 1)
         self.assertNotIn("Amoxicilline", mail.outbox[0].body)
 
+    # ---------- Panier en ligne confirmé sans réseau ----------
+
+    def _panier(self, *lignes):
+        panier = services.get_panier(self.formation)
+        for produit, quantite in lignes:
+            services.ajouter_produit(panier, produit, quantite)
+        return panier
+
+    def test_un_panier_confirme_sans_reseau_quitte_le_panier(self):
+        """Sinon, resté plein, le panier pourrait être confirmé une seconde fois en ligne."""
+        panier = self._panier((self.paracetamol, 2), (self.amoxicilline, 1))
+
+        donnees = self._envoyer(
+            [{"produit": self.paracetamol.pk, "quantite": 2}, {"produit": self.amoxicilline.pk, "quantite": 1}],
+            panier=panier.pk,
+        ).json()
+
+        self.assertEqual(donnees["statut"], StatutCommande.CONFIRMEE)
+        panier.refresh_from_db()
+        self.assertEqual(panier.statut, StatutCommande.BROUILLON)
+        self.assertFalse(panier.lignes.exists())
+        self.assertEqual(panier.montant_total, Decimal("0"))
+
+    def test_une_ligne_changee_en_ligne_depuis_la_page_enregistree_reste_au_panier(self):
+        """La page du panier enregistrée montrait Paracetamol × 2 ; la FOSA l'a passé à
+        5 en ligne ensuite. Seul ce qui a été envoyé quitte le panier."""
+        panier = self._panier((self.paracetamol, 5), (self.amoxicilline, 1))
+
+        self._envoyer(
+            [{"produit": self.paracetamol.pk, "quantite": 2}, {"produit": self.amoxicilline.pk, "quantite": 1}],
+            panier=panier.pk,
+        )
+
+        self.assertEqual(list(panier.lignes.values_list("produit", "quantite")), [(self.paracetamol.pk, 5)])
+
+    def test_le_panier_d_une_autre_fosa_n_est_pas_touche(self):
+        autre_user = User.objects.create_user(username="csi2", password="x", role=Role.FORMATION_SANITAIRE)
+        autre = FormationSanitaire.objects.create(user=autre_user, nom="Autre FOSA")
+        panier_autre = services.get_panier(autre)
+        services.ajouter_produit(panier_autre, self.paracetamol, 2)
+
+        self._envoyer([{"produit": self.paracetamol.pk, "quantite": 2}], panier=panier_autre.pk)
+
+        self.assertEqual(panier_autre.lignes.get().quantite, 2)
+
+    def test_un_renvoi_ne_retire_rien_de_plus_du_panier(self):
+        """Après l'envoi, la FOSA remet le même produit au panier en ligne : le renvoi
+        tardif de la même demande ne doit pas le lui reprendre."""
+        panier = self._panier((self.paracetamol, 2))
+        identifiant = uuid.uuid4()
+        lignes = [{"produit": self.paracetamol.pk, "quantite": 2}]
+        self._envoyer(lignes, uuid_client=identifiant, panier=panier.pk)
+        services.ajouter_produit(panier, self.paracetamol, 2)
+
+        self._envoyer(lignes, uuid_client=identifiant, panier=panier.pk)
+
+        self.assertEqual(panier.lignes.get().quantite, 2)
+
+    def test_la_page_du_panier_porte_de_quoi_le_confirmer_sans_reseau(self):
+        panier = self._panier((self.paracetamol, 3))
+
+        page = self.client.get(reverse("commandes:panier")).content.decode()
+
+        self.assertIn(f'class="form-confirmer" data-panier-id="{panier.pk}"', page)
+        self.assertIn(f'data-ligne-produit="{self.paracetamol.pk}"', page)
+        self.assertIn('data-ligne-quantite="3"', page)
+        self.assertIn('data-ligne-prix="100.50"', page)
+
     def test_une_commande_en_ligne_garde_son_affichage(self):
         """Les colonnes Demandé/Servi ne concernent que les commandes hors connexion."""
         commande = services.get_panier(self.formation)

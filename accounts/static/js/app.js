@@ -134,8 +134,9 @@
         if (navigator.onLine !== false) return;
         var formulaire = evenement.target;
         if ((formulaire.getAttribute("method") || "get").toLowerCase() !== "post") return;
-        // L'ajout au panier du catalogue, lui, part dans la commande hors connexion.
-        if (commandeHorsLigne && formulaire.classList.contains("form-ajout")) return;
+        // L'ajout au catalogue et la confirmation du panier, eux, partent dans une
+        // commande préparée hors connexion.
+        if (commandeHorsLigne && (formulaire.classList.contains("form-ajout") || formulaire.classList.contains("form-confirmer"))) return;
         evenement.preventDefault();
         evenement.stopImmediatePropagation();
         afficherToast("Pas de réseau : rien n'a été envoyé. Vos saisies sont conservées, réessayez quand le réseau revient.", "warning");
@@ -402,6 +403,23 @@
         var coupureLe = 0;
         var DUREE_COUPURE_MS = 60000;
 
+        // Page resservie par le service worker (réseau absent ou trop lent) : la marque
+        // posée sur <html> suffit à savoir que le réseau ne répond pas, sans attendre
+        // l'échec d'un premier envoi.
+        var pageDepuisCache = document.documentElement.getAttribute("data-hors-ligne") === "1";
+
+        function horsLigneProbable() {
+            return navigator.onLine === false || pageDepuisCache || Date.now() - coupureLe < DUREE_COUPURE_MS;
+        }
+
+        // Date à laquelle le serveur a produit la page affichée.
+        function pageRendueLe() {
+            var brut = document.documentElement.getAttribute("data-enregistre-le");
+            var date = brut ? new Date(brut) : null;
+            if (date && !isNaN(date.getTime())) return date.getTime();
+            return (window.performance && performance.timeOrigin) || Date.now();
+        }
+
         function jeton() {
             // Le cookie d'abord : Django change le jeton à chaque connexion, et une page
             // resservie depuis le cache porte celui de son enregistrement.
@@ -582,8 +600,8 @@
 
         function afficher() {
             var cartes = [];
-            demandes.forEach(function (d) { if (d.etat === "envoyee") cartes.push(carteEnvoyee(d)); });
-            demandes.forEach(function (d) { if (d.etat === "refusee") cartes.push(carteRefusee(d)); });
+            demandes.forEach(function (d) { if (d.etat === "envoyee" && !d.masquee_le) cartes.push(carteEnvoyee(d)); });
+            demandes.forEach(function (d) { if (d.etat === "refusee" && !d.masquee_le) cartes.push(carteRefusee(d)); });
             enAttente().forEach(function (d) { cartes.push(carteEnAttente(d)); });
             if (brouillon()) cartes.push(carteBrouillon(brouillon()));
             while (conteneur.firstChild) conteneur.removeChild(conteneur.firstChild);
@@ -613,11 +631,43 @@
             });
         }
 
+        // Le panier en ligne est déjà parti en commande hors connexion depuis ce
+        // téléphone : en attente d'envoi, ou envoyé après que cette page a été produite
+        // (elle montre donc encore des produits que le serveur a retirés du panier).
+        function panierDejaParti(panierId) {
+            var renduLe = pageRendueLe();
+            return demandes.some(function (d) {
+                if (!d.panier || String(d.panier) !== String(panierId)) return false;
+                if (d.etat === "en_attente") return true;
+                return d.etat === "envoyee" && !!d.envoyee_le && new Date(d.envoyee_le).getTime() > renduLe;
+            });
+        }
+
+        // Sur la page du panier : pas de seconde confirmation d'un panier déjà parti.
+        function garderPanier() {
+            var formulaire = document.querySelector(".form-confirmer[data-panier-id]");
+            if (!formulaire) return;
+            var parti = panierDejaParti(formulaire.getAttribute("data-panier-id"));
+            var note = document.getElementById("note-panier-parti");
+            formulaire.hidden = parti;
+            if (!parti) {
+                if (note) note.parentNode.removeChild(note);
+                return;
+            }
+            if (!note) {
+                note = el("p", "alert alert-info mb-0", "📤 Ce panier est déjà parti en commande hors connexion depuis ce " +
+                    "téléphone. Actualisez la page une fois le réseau revenu pour voir ce qu'il en reste.");
+                note.id = "note-panier-parti";
+                formulaire.parentNode.insertBefore(note, formulaire);
+            }
+        }
+
         function recharger() {
             return D.lister(compte).then(function (liste) {
                 demandes = liste;
                 afficher();
                 marquerFiches();
+                garderPanier();
                 return liste;
             });
         }
@@ -674,7 +724,7 @@
             }
             var erreur = fiche ? fiche.querySelector(".erreur-ajout") : null;
             if (erreur) erreur.hidden = true;
-            var sansReseau = navigator.onLine === false || Date.now() - coupureLe < DUREE_COUPURE_MS;
+            var sansReseau = horsLigneProbable();
             D.fixerQuantite(compte, produit, quantite).then(recharger).then(function () {
                 afficherToast(sansReseau
                     ? "Sans réseau : " + produit.nom + " gardé dans la commande préparée sur ce téléphone."
@@ -716,7 +766,7 @@
                     "Si elle est déjà partie, elle apparaîtra quand même dans « Mes commandes ».")) return;
                 suite = D.supprimer(uuid);
             } else if (action === "effacer") {
-                suite = D.supprimer(uuid);
+                suite = D.masquer(uuid);
             }
             if (suite) {
                 suite.then(recharger).then(function () {
@@ -738,11 +788,50 @@
             D.fixerQuantite(compte, {id: champ.getAttribute("data-produit")}, quantite).then(recharger, erreurMemoire);
         });
 
+        // Confirmation du panier en ligne sans réseau : il part comme une commande
+        // préparée hors connexion, tel que la page enregistrée l'affiche. Écoute en phase
+        // de capture pour passer avant le confirm() du gabarit, dont le texte (« le
+        // stock sera débité ») serait faux ici.
+        window.addEventListener("submit", function (evenement) {
+            var formulaire = evenement.target;
+            if (!formulaire.classList || !formulaire.classList.contains("form-confirmer")) return;
+            var panierId = formulaire.getAttribute("data-panier-id");
+            if (panierDejaParti(panierId)) {
+                evenement.preventDefault();
+                evenement.stopImmediatePropagation();
+                afficherToast("Ce panier est déjà parti en commande hors connexion depuis ce téléphone.", "warning");
+                return;
+            }
+            if (!horsLigneProbable()) return; // en ligne : confirmation habituelle
+            evenement.preventDefault();
+            evenement.stopImmediatePropagation();
+            var lignes = Array.prototype.map.call(document.querySelectorAll("tr[data-ligne-produit]"), function (rangee) {
+                return {
+                    produit: Number(rangee.getAttribute("data-ligne-produit")),
+                    nom: rangee.getAttribute("data-ligne-nom"),
+                    prix: Number(rangee.getAttribute("data-ligne-prix")) || 0,
+                    stock: Number(rangee.getAttribute("data-ligne-stock")) || 0,
+                    quantite: Number(rangee.getAttribute("data-ligne-quantite")),
+                };
+            }).filter(function (ligne) { return ligne.produit && ligne.quantite > 0; });
+            if (!lignes.length) return;
+            if (!window.confirm("Pas de réseau : envoyer ce panier (" + produits(lignes.length) + ") " +
+                "comme commande préparée hors connexion ?\n\nIl partira dès le retour du réseau. Le FRPS le " +
+                "valide à son arrivée, avec le stock et les prix de ce moment-là : il ne sert et ne facture " +
+                "que ce qui est disponible.")) return;
+            D.creerDemande(compte, lignes, Number(panierId)).then(function () {
+                programmerSynchro();
+                afficherToast("Panier enregistré sur ce téléphone : il partira dès le retour du réseau.", "success");
+                return recharger();
+            }, erreurMemoire).then(envoyer);
+        }, true);
+
         commandeHorsLigne = {
-            // Le produit va dans la commande hors connexion : sans réseau, juste après une
-            // coupure, ou si une commande y est déjà commencée (on ne la coupe pas en deux).
+            // Le produit va dans la commande hors connexion : sans réseau, page resservie
+            // depuis le cache, juste après une coupure, ou si une commande y est déjà
+            // commencée (on ne la coupe pas en deux).
             prendLaMain: function () {
-                return navigator.onLine === false || !!brouillon() || Date.now() - coupureLe < DUREE_COUPURE_MS;
+                return horsLigneProbable() || !!brouillon();
             },
             ajouter: ajouter,
             signalerCoupure: function () { coupureLe = Date.now(); },
@@ -751,7 +840,7 @@
         // Envoi par la page : à l'ouverture, au retour du réseau, au retour sur
         // l'application, et toutes les minutes tant qu'une commande attend (réseau
         // présent mais trop faible pour qu'elle soit passée).
-        recharger().then(function () {
+        D.purger(compte).catch(function () {}).then(recharger).then(function () {
             if (enAttente().length) {
                 programmerSynchro();
                 if (navigator.onLine !== false) envoyer();

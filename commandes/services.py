@@ -101,24 +101,29 @@ def _debiter_stock(lignes):
 # arrive.
 
 
-def synchroniser_demande(formation_sanitaire, uuid_client, quantites):
+def synchroniser_demande(formation_sanitaire, uuid_client, quantites, panier_id=None):
     """Reçoit puis valide une demande hors connexion. Retourne (commande, reçue_maintenant).
 
     `quantites` : {produit_id: quantité demandée}. Renvoyer la même demande (même
     `uuid_client`) ne crée rien de plus et ne débite rien de plus : on retrouve la
     commande, et on termine sa validation si un envoi précédent l'avait laissée en
-    route.
+    route. `panier_id` : voir recevoir_demande.
     """
-    commande, recue_maintenant = recevoir_demande(formation_sanitaire, uuid_client, quantites)
+    commande, recue_maintenant = recevoir_demande(formation_sanitaire, uuid_client, quantites, panier_id)
     return valider_demande(commande), recue_maintenant
 
 
-def recevoir_demande(formation_sanitaire, uuid_client, quantites):
+def recevoir_demande(formation_sanitaire, uuid_client, quantites, panier_id=None):
     """Enregistre la demande telle qu'envoyée, sans toucher au stock.
 
     Séparée de la validation pour que la demande soit acquise dès sa réception : si
     la validation échoue ensuite, la commande reste « en attente de validation » et
     le renvoi automatique du téléphone la reprend, sans rien perdre ni doubler.
+
+    `panier_id` : la FOSA a confirmé sans réseau son panier en ligne (brouillon), tel
+    que l'affichait la page enregistrée. Les produits envoyés en sortent, dans la même
+    transaction que la création : sinon, resté plein, le panier pourrait être confirmé
+    une seconde fois.
     """
     existante = Commande.objects.filter(uuid_client=uuid_client).first()
     if existante is not None:
@@ -147,12 +152,32 @@ def recevoir_demande(formation_sanitaire, uuid_client, quantites):
                 )
                 for produit_id, produit in produits.items()
             )
+            if panier_id is not None:
+                _retirer_du_panier(formation_sanitaire, panier_id, quantites)
     except IntegrityError:
         # La même demande est arrivée deux fois en même temps (le service worker et la
         # page l'envoient chacun au retour du réseau) : l'autre requête l'a créée.
         existante = Commande.objects.get(uuid_client=uuid_client)
         return _demande_du_meme_compte(existante, formation_sanitaire), False
     return commande, True
+
+
+def _retirer_du_panier(formation_sanitaire, panier_id, quantites):
+    panier = Commande.objects.filter(
+        pk=panier_id, formation_sanitaire=formation_sanitaire, statut=StatutCommande.BROUILLON
+    ).first()
+    if panier is None:
+        return
+    # Seulement les lignes identiques à ce qui a été envoyé. La page enregistrée a pu
+    # être périmée (produit ajouté ou quantité changée en ligne depuis) : une ligne qui
+    # diffère reste au panier, où la FOSA la retrouvera, plutôt que de disparaître
+    # sans avoir été commandée.
+    envoyees = [
+        ligne.pk for ligne in panier.lignes.all() if quantites.get(ligne.produit_id) == ligne.quantite
+    ]
+    if envoyees:
+        panier.lignes.filter(pk__in=envoyees).delete()
+        panier.recalculer_montant()
 
 
 def _demande_du_meme_compte(commande, formation_sanitaire):

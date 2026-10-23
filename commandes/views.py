@@ -184,6 +184,8 @@ def synchroniser_demande(request):
         donnees = json.loads(request.body)
         uuid_client = uuid.UUID(str(donnees["uuid"]))
         quantites = _lire_quantites(donnees["lignes"])
+        # Panier en ligne confirmé sans réseau (voir services.recevoir_demande).
+        panier_id = int(donnees["panier"]) if donnees.get("panier") is not None else None
     except (ValueError, KeyError, TypeError):
         return JsonResponse({"ok": False, "code": "illisible", "message": "Demande illisible."}, status=400)
 
@@ -197,7 +199,7 @@ def synchroniser_demande(request):
 
     try:
         commande, recue_maintenant = services.synchroniser_demande(
-            request.user.formation_sanitaire, uuid_client, quantites
+            request.user.formation_sanitaire, uuid_client, quantites, panier_id
         )
     except services.DemandeInvalideError as exc:
         return JsonResponse({"ok": False, "code": "refusee", "message": str(exc)}, status=400)

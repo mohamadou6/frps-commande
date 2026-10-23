@@ -162,8 +162,50 @@
         });
     }
 
+    // Panier en ligne confirmé sans réseau : la demande naît directement en attente.
+    // `panier` (id du brouillon serveur) permet au serveur d'en retirer ce qui part.
+    function creerDemande(compte, lignes, panier) {
+        var demande = {
+            uuid: nouvelUuid(),
+            compte: String(compte),
+            etat: "en_attente",
+            lignes: lignes,
+            panier: panier || null,
+            creee_le: maintenant(),
+            validee_le: maintenant(),
+        };
+        return enregistrer(demande).then(function () { return demande; });
+    }
+
     function supprimer(uuid) {
         return transaction("readwrite", function (magasin) { magasin.delete(uuid); });
+    }
+
+    // La FOSA a pris connaissance du résultat. On garde la trace un temps au lieu de
+    // l'effacer : une page de panier enregistrée avant l'envoi montre encore les
+    // produits partis, et c'est cette trace qui empêche de les confirmer une seconde fois.
+    function masquer(uuid) {
+        return transaction("readwrite", function (magasin) {
+            var requete = magasin.get(uuid);
+            requete.onsuccess = function () {
+                if (!requete.result) return;
+                requete.result.masquee_le = maintenant();
+                magasin.put(requete.result);
+            };
+        });
+    }
+
+    var DUREE_TRACE_MS = 30 * 24 * 3600 * 1000;
+
+    function purger(compte) {
+        var limite = new Date(Date.now() - DUREE_TRACE_MS).toISOString();
+        return transaction("readwrite", function (magasin) {
+            lireTout(magasin, compte, function (liste) {
+                liste.forEach(function (d) {
+                    if (d.masquee_le && d.masquee_le < limite) magasin.delete(d.uuid);
+                });
+            });
+        });
     }
 
     function enregistrer(demande) {
@@ -199,6 +241,7 @@
                 body: JSON.stringify({
                     uuid: demande.uuid,
                     compte: demande.compte,
+                    panier: demande.panier || null,
                     lignes: demande.lignes.map(function (l) { return {produit: l.produit, quantite: l.quantite}; }),
                 }),
                 signal: arret ? arret.signal : undefined,
@@ -283,7 +326,10 @@
         fixerQuantite: fixerQuantite,
         viderBrouillon: viderBrouillon,
         validerBrouillon: validerBrouillon,
+        creerDemande: creerDemande,
         supprimer: supprimer,
+        masquer: masquer,
+        purger: purger,
         envoyerEnAttente: envoyerEnAttente,
     };
 })(self);
