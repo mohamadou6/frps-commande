@@ -54,6 +54,13 @@
 
 {% if resultats.modifies %}
 <h2 class="h6">Produits modifiés</h2>
+{% if resultats.nb_hausses or resultats.nb_baisses %}
+<p class="small mb-2">
+    Changements de prix (en tête de liste) :
+    <span class="pastille-prix prix-hausse">▲ {{ resultats.nb_hausses }} hausse{{ resultats.nb_hausses|pluralize }}</span>
+    <span class="pastille-prix prix-baisse">▼ {{ resultats.nb_baisses }} baisse{{ resultats.nb_baisses|pluralize }}</span>
+</p>
+{% endif %}
 <div class="table-responsive mb-4">
 <table class="table table-striped">
     <thead><tr><th>Produit</th><th>Prix</th><th>Stock</th></tr></thead>
@@ -61,7 +68,13 @@
         {% for m in resultats.modifies|slice:":300" %}
         <tr>
             <td>{{ m.nom }} <span class="text-muted small">({{ m.code_sage }})</span></td>
+            {% if m.variation_prix == "hausse" %}
+            <td class="prix-hausse" title="Prix en hausse">{{ m.ancien_prix }} → <strong>{{ m.nouveau_prix }}</strong> ▲</td>
+            {% elif m.variation_prix == "baisse" %}
+            <td class="prix-baisse" title="Prix en baisse">{{ m.ancien_prix }} → <strong>{{ m.nouveau_prix }}</strong> ▼</td>
+            {% else %}
             <td>{{ m.ancien_prix }} → <strong>{{ m.nouveau_prix }}</strong></td>
+            {% endif %}
             <td>{{ m.ancien_stock }} → <strong>{{ m.nouveau_stock }}</strong></td>
         </tr>
         {% endfor %}

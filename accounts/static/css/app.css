@@ -930,6 +930,14 @@ a.card:hover {
     .quantite-panier { height: 40px; }
 }
 
+/* ---------- Import Excel : variation de prix ---------- */
+/* Hausse en rouge, baisse en vert. --bs-table-bg-state passe devant la rayure de
+   .table-striped (Bootstrap 5.3). */
+.prix-hausse, .prix-baisse { --bs-table-bg-state: var(--teinte); color: var(--texte) !important; font-weight: 600; }
+.prix-hausse { --teinte: var(--app-teinte-rouge); --texte: var(--app-texte-rouge); }
+.prix-baisse { --teinte: var(--app-teinte-vert); --texte: var(--app-texte-vert); }
+.pastille-prix { display: inline-block; padding: .15rem .6rem; border-radius: 999px; background: var(--teinte); color: var(--texte); font-weight: 600; }
+
 /* ---------- Paiement ---------- */
 /* Une « caisse » étroite et centrée, comme sur les sites de paiement en ligne,
    lisible d'une main sur téléphone. */

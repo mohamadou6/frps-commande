@@ -178,12 +178,19 @@ def importer_produits(request):
                     if produit.prix_unitaire == prix and produit.stock_disponible == stock:
                         nb_inchanges += 1
                         continue
+                    if prix > produit.prix_unitaire:
+                        variation_prix = "hausse"
+                    elif prix < produit.prix_unitaire:
+                        variation_prix = "baisse"
+                    else:
+                        variation_prix = ""
                     modifies.append(
                         {
                             "code_sage": code_sage,
                             "nom": produit.nom,
                             "ancien_prix": produit.prix_unitaire,
                             "nouveau_prix": prix,
+                            "variation_prix": variation_prix,
                             "ancien_stock": produit.stock_disponible,
                             "nouveau_stock": stock,
                         }
@@ -197,10 +204,16 @@ def importer_produits(request):
                 if a_creer:
                     Produit.objects.bulk_create(a_creer, batch_size=200)
 
+                # Changements de prix en tête de liste : noyés parmi les simples
+                # mouvements de stock, ils passaient inaperçus.
+                modifies.sort(key=lambda m: m["variation_prix"] == "")
+
                 resultats = {
                     "total_lignes": len(updates),
                     "modifies": modifies,
                     "nb_modifies": len(modifies),
+                    "nb_hausses": sum(m["variation_prix"] == "hausse" for m in modifies),
+                    "nb_baisses": sum(m["variation_prix"] == "baisse" for m in modifies),
                     "nb_inchanges": nb_inchanges,
                     "crees": crees,
                     "nb_crees": len(crees),
