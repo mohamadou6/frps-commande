@@ -1,3 +1,4 @@
+import csv
 import importlib
 import io
 from decimal import Decimal
@@ -129,3 +130,39 @@ class RayonAutresTests(TestCase):
         rayons = self.client.get(reverse("catalogue:liste")).context["rayons"]
 
         self.assertNotIn("autres", [r.slug for r in rayons])
+
+
+class MigrationRayonsLaboratoireMaterielTests(TestCase):
+    def setUp(self):
+        self.migration = importlib.import_module("catalogue.migrations.0007_rayons_laboratoire_materiel_et_classement")
+
+    def test_cree_les_deux_rayons_et_range_selon_le_fichier(self):
+        # Codes du fichier : un test VIH (Laboratoire), une insuline (chaîne du froid, choix FRPS).
+        lignes = list(csv.DictReader(open(self.migration.CSV_PATH, encoding="utf-8-sig"), delimiter=";"))
+        rayon_de = {ligne["code_sage"]: ligne["rayon"] for ligne in lignes}
+        code_labo = next(c for c, r in rayon_de.items() if r == "laboratoire")
+        Produit.objects.create(code_sage=code_labo, nom="labo", prix_unitaire=1, stock_disponible=1)
+
+        self.migration.classer(django_apps, None)
+
+        self.assertEqual(Produit.objects.get(code_sage=code_labo).rayon.nom, "Laboratoire")
+        self.assertTrue(Rayon.objects.filter(slug="materiel", nom="Matériel").exists())
+
+    def test_n_ecrase_pas_un_rayon_existant(self):
+        lignes = list(csv.DictReader(open(self.migration.CSV_PATH, encoding="utf-8-sig"), delimiter=";"))
+        code = lignes[0]["code_sage"]
+        kits = Rayon.objects.get(slug="kits")
+        Produit.objects.create(code_sage=code, nom="x", prix_unitaire=1, stock_disponible=1, rayon=kits)
+
+        self.migration.classer(django_apps, None)
+
+        self.assertEqual(Produit.objects.get(code_sage=code).rayon, kits)
+
+    def test_le_fichier_ne_cite_que_des_rayons_connus_sans_doublon(self):
+        lignes = list(csv.DictReader(open(self.migration.CSV_PATH, encoding="utf-8-sig"), delimiter=";"))
+        connus = {"injectables", "comprimes", "sirops", "solutes", "consommables-medicaux",
+                  "sante-de-reproduction", "kits", "papeterie-et-froid", "application-externe",
+                  "laboratoire", "materiel"}
+
+        self.assertTrue({ligne["rayon"] for ligne in lignes} <= connus)
+        self.assertEqual(len({ligne["code_sage"] for ligne in lignes}), len(lignes))
