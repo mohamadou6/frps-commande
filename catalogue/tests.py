@@ -79,12 +79,17 @@ class MigrationRayonsProduitsSansRayonTests(TestCase):
 
         self.assertEqual(Produit.objects.get(code_sage="CAPTO_25MG").rayon, sirops)
 
-    def test_les_trois_corrections_validees_par_le_frps(self):
-        rayon_de = {c: r for r, liste in self.migration.CLASSEMENT.items() for c in liste}
+    def test_phenobarbital_betadine_et_benzoate_finissent_en_injectables(self):
+        codes = ["PHENOB_100/_AM_IV", "POLYVI_4%_1000M///", "BENZOA_25%/_SC_12"]
+        for code in codes:
+            Produit.objects.create(code_sage=code, nom=code, prix_unitaire=1, stock_disponible=1)
+        suivante = importlib.import_module("catalogue.migrations.0006_betadine_benzoate_injectables")
 
-        self.assertEqual(rayon_de["PHENOB_100/_AM_IV"], "injectables")
-        self.assertEqual(rayon_de["POLYVI_4%_1000M///"], "application-externe")
-        self.assertEqual(rayon_de["BENZOA_25%/_SC_12"], "application-externe")
+        self.migration.classer(django_apps, None)
+        suivante.ranger_en_injectables(django_apps, None)
+
+        for code in codes:
+            self.assertEqual(Produit.objects.get(code_sage=code).rayon.slug, "injectables", code)
 
     def test_le_classement_couvre_les_60_produits_du_fichier_sans_doublon(self):
         codes = [c for liste in self.migration.CLASSEMENT.values() for c in liste]
