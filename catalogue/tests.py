@@ -96,3 +96,36 @@ class MigrationRayonsProduitsSansRayonTests(TestCase):
 
         self.assertEqual(len(codes), 60)
         self.assertEqual(len(set(codes)), 60)
+
+
+class RayonAutresTests(TestCase):
+    """Les produits sans rayon sont regroupés dans un rayon « Autres » du catalogue."""
+
+    def setUp(self):
+        from accounts.models import FormationSanitaire
+
+        fosa = User.objects.create_user(username="csi1", password="x", role=Role.FORMATION_SANITAIRE)
+        FormationSanitaire.objects.create(user=fosa, nom="CSI Test")
+        self.client.force_login(fosa)
+        comprimes = Rayon.objects.get(slug="comprimes")
+        Produit.objects.create(code_sage="RANGE", nom="Rangé", prix_unitaire=1, stock_disponible=5, rayon=comprimes)
+        Produit.objects.create(code_sage="ORPHELIN", nom="Orphelin", prix_unitaire=1, stock_disponible=5)
+        Produit.objects.create(code_sage="EPUISE", nom="Épuisé", prix_unitaire=1, stock_disponible=0)
+
+    def test_autres_apparait_en_fin_de_liste_avec_les_produits_disponibles_sans_rayon(self):
+        rayons = self.client.get(reverse("catalogue:liste")).context["rayons"]
+
+        self.assertEqual((rayons[-1].slug, rayons[-1].nb_produits), ("autres", 1))
+
+    def test_filtrer_sur_autres_ne_montre_que_les_produits_sans_rayon(self):
+        reponse = self.client.get(reverse("catalogue:liste"), {"rayon": "autres"})
+
+        self.assertEqual([p.code_sage for p in reponse.context["produits"]], ["ORPHELIN"])
+        self.assertEqual(reponse.context["rayon_actif"].nom, "Autres")
+
+    def test_pas_de_rayon_autres_quand_tout_est_range(self):
+        Produit.objects.filter(code_sage="ORPHELIN").update(rayon=Rayon.objects.get(slug="sirops"))
+
+        rayons = self.client.get(reverse("catalogue:liste")).context["rayons"]
+
+        self.assertNotIn("autres", [r.slug for r in rayons])

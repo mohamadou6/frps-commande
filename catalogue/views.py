@@ -11,6 +11,8 @@ from commandes.models import Commande, StatutCommande
 
 from .models import Magasin, Produit, Rayon
 
+SLUG_AUTRES = "autres"
+
 
 @formation_sanitaire_required
 def liste(request):
@@ -28,8 +30,17 @@ def liste(request):
         .order_by("nom")
     )
 
+    # Rayon virtuel « Autres » : les produits sans rayon affecté, sinon introuvables
+    # autrement que par la recherche.
+    nb_sans_rayon = produits_visibles.filter(rayon__isnull=True).count()
+    if nb_sans_rayon:
+        rayons.append(Rayon(slug=SLUG_AUTRES, nom="Autres", icone="📦"))
+        rayons[-1].nb_produits = nb_sans_rayon
+
     produits = produits_visibles.order_by("nom")
-    if rayon_slug:
+    if rayon_slug == SLUG_AUTRES:
+        produits = produits.filter(rayon__isnull=True)
+    elif rayon_slug:
         produits = produits.filter(rayon__slug=rayon_slug)
     if query:
         produits = produits.filter(nom__icontains=query)
