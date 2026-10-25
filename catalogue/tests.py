@@ -166,3 +166,32 @@ class MigrationRayonsLaboratoireMaterielTests(TestCase):
 
         self.assertTrue({ligne["rayon"] for ligne in lignes} <= connus)
         self.assertEqual(len({ligne["code_sage"] for ligne in lignes}), len(lignes))
+
+
+class MigrationRayonsQuatreDerniersProduitsTests(TestCase):
+    """Les 4 produits absents du fichier du 25/10/2026 : plus aucun produit sans rayon."""
+
+    def setUp(self):
+        self.migration = importlib.import_module("catalogue.migrations.0008_rayons_quatre_derniers_produits")
+
+    def test_range_les_quatre_produits_dans_le_rayon_prevu(self):
+        for code in self.migration.CLASSEMENT:
+            Produit.objects.create(code_sage=code, nom=code, prix_unitaire=0, stock_disponible=0)
+
+        self.migration.classer(django_apps, None)
+
+        rayons = dict(Produit.objects.values_list("code_sage", "rayon__slug"))
+        self.assertEqual(rayons, self.migration.CLASSEMENT)
+
+    def test_n_ecrase_pas_un_rayon_deja_choisi_a_la_main(self):
+        kits = Rayon.objects.get(slug="kits")
+        Produit.objects.create(code_sage="TOTAMI_////_//_//", nom="Totamine", prix_unitaire=0, stock_disponible=0, rayon=kits)
+
+        self.migration.classer(django_apps, None)
+
+        self.assertEqual(Produit.objects.get(code_sage="TOTAMI_////_//_//").rayon, kits)
+
+    def test_ne_cite_que_des_rayons_existants(self):
+        existants = set(Rayon.objects.values_list("slug", flat=True))
+
+        self.assertTrue(set(self.migration.CLASSEMENT.values()) <= existants)
