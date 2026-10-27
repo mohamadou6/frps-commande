@@ -1,10 +1,23 @@
 from functools import wraps
 
+from django.contrib import messages
+from django.contrib.auth import logout
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.shortcuts import redirect
 
+from .forms import MESSAGE_FOSA_SANS_FICHE
 from .models import Role
+
+
+def _deconnecter_fosa_sans_fiche(request):
+    """Session ouverte par un compte FOSA sans fiche (avant que la connexion ne le
+    refuse, ou fiche supprimée depuis) : ce compte ne peut rien faire, et les vues
+    FOSA planteraient sur `request.user.formation_sanitaire`. On le déconnecte avec
+    le motif plutôt que de laisser une erreur 500."""
+    logout(request)
+    messages.error(request, MESSAGE_FOSA_SANS_FICHE)
+    return redirect("login")
 
 
 def formation_sanitaire_required(view_func):
@@ -16,6 +29,8 @@ def formation_sanitaire_required(view_func):
     @wraps(view_func)
     def wrapper(request, *args, **kwargs):
         user = request.user
+        if user.est_fosa_sans_fiche:
+            return _deconnecter_fosa_sans_fiche(request)
         if user.is_formation_sanitaire or user.role == Role.ADMIN:
             return view_func(request, *args, **kwargs)
         return redirect("notifications:liste")
@@ -73,6 +88,8 @@ def formation_sanitaire_only_required(view_func):
     @wraps(view_func)
     def wrapper(request, *args, **kwargs):
         user = request.user
+        if user.est_fosa_sans_fiche:
+            return _deconnecter_fosa_sans_fiche(request)
         if user.is_formation_sanitaire:
             return view_func(request, *args, **kwargs)
         if user.role == Role.ADMIN:

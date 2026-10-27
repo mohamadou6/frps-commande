@@ -19,7 +19,7 @@
         </div>
 
         {% if form.errors %}
-        <div class="login-alert">Identifiants incorrects.</div>
+        <div class="login-alert">{% if form.compte_non_rattache %}{{ form.non_field_errors.0 }}{% else %}Identifiants incorrects.{% endif %}</div>
         {% endif %}
 
         <form method="post">

@@ -3,6 +3,8 @@ from django.urls import reverse_lazy
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import never_cache
 
+from .forms import ConnexionForm
+
 
 @method_decorator(never_cache, name="dispatch")
 class LoginView(auth_views.LoginView):
@@ -14,6 +16,8 @@ class LoginView(auth_views.LoginView):
     connexion mise en cache avec un jeton CSRF périmé — cause du 403 "CSRF
     verification failed" observé à la première connexion tant que la page
     n'était pas rechargée manuellement."""
+
+    authentication_form = ConnexionForm
 
     def get_success_url(self):
         if self.request.user.is_formation_sanitaire:

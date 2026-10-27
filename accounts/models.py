@@ -1,4 +1,5 @@
 from django.contrib.auth.models import AbstractUser
+from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
 
 
@@ -24,6 +25,23 @@ class User(AbstractUser):
     @property
     def is_formation_sanitaire(self):
         return self.role == Role.FORMATION_SANITAIRE
+
+    @property
+    def fiche_fosa(self):
+        """Fiche FormationSanitaire du compte, ou None.
+
+        Un compte au rôle FOSA peut exister sans fiche (créé à la main dans l'admin
+        sans la fiche associée). Lire `user.formation_sanitaire` lève alors une
+        exception : depuis un context processor, elle faisait tomber toutes les pages
+        en 500 dès la connexion de ce compte (constaté en prod le 2026-10-27)."""
+        try:
+            return self.formation_sanitaire
+        except ObjectDoesNotExist:
+            return None
+
+    @property
+    def est_fosa_sans_fiche(self):
+        return self.is_formation_sanitaire and self.fiche_fosa is None
 
     @property
     def is_admin_frps(self):
