@@ -221,6 +221,23 @@ EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS", default=True)
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="rapports@frpsno.com")
 
 
+# --- Journalisation ---
+# Sans ce bloc, une erreur 500 en production (DEBUG=False) ne laisse aucune trace : le
+# handler console de Django est réservé au mode DEBUG et ADMINS est vide. On envoie la
+# trace complète de chaque erreur 500 sur la sortie standard, lue par les logs Render.
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {
+        "console": {"class": "logging.StreamHandler"},
+    },
+    "root": {"handlers": ["console"], "level": "WARNING"},
+    "loggers": {
+        "django.request": {"handlers": ["console"], "level": "ERROR", "propagate": False},
+    },
+}
+
+
 # --- Sécurité production ---
 # Le tunnel Cloudflare termine le HTTPS et transmet en HTTP en interne : Django doit
 # faire confiance à l'en-tête X-Forwarded-Proto pour savoir que la requête est bien HTTPS.
