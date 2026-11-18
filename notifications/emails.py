@@ -11,7 +11,7 @@ from django.core.mail import EmailMessage, get_connection
 
 from frps_project.formatage import formater_montant, formater_prix
 
-from .models import EmailLog, StatutEnvoi, TypeEvenement
+from .models import DestinataireEmail, EmailLog, StatutEnvoi, TypeEvenement
 from .pdf import generer_pdf_commande
 
 logger = logging.getLogger(__name__)
@@ -28,14 +28,24 @@ def destinataires_personnel_frps():
     """
     from accounts.models import Role, User
 
-    return sorted(
-        set(
-            User.objects.filter(is_active=True)
-            .exclude(role=Role.FORMATION_SANITAIRE)
-            .exclude(email="")
-            .values_list("email", flat=True)
-        )
+    comptes = (
+        User.objects.filter(is_active=True)
+        .exclude(role=Role.FORMATION_SANITAIRE)
+        .exclude(email="")
+        .values_list("email", flat=True)
     )
+    # + les adresses ajoutées dans Paramètres pour les commandes (boîte de service…).
+    return fusionner_adresses(comptes, DestinataireEmail.objects.pour("recoit_commandes").values_list("email", flat=True))
+
+
+def fusionner_adresses(*listes):
+    """Adresses sans doublon, la casse ne comptant pas (Jean@x.cm = jean@x.cm)."""
+    vues = {}
+    for liste in listes:
+        for adresse in liste:
+            if adresse:
+                vues.setdefault(adresse.strip().lower(), adresse.strip())
+    return sorted(vues.values(), key=str.lower)
 
 
 def _corps_nouvelle_commande(commande):
@@ -102,18 +112,28 @@ def envoyer_email_nouvelle_commande(commande):
     except Exception:  # noqa: BLE001 - le PDF ne doit pas bloquer la notification
         logger.exception("Commande #%s : PDF non généré, email envoyé sans pièce jointe", commande.pk)
 
+    pieces = [(f"commande_{commande.pk}.pdf", pdf, "application/pdf")] if pdf else []
+    return envoyer_un_par_un(
+        destinataires, sujet, corps, TypeEvenement.NOUVELLE_COMMANDE, commande=commande, pieces=pieces
+    )
+
+
+def envoyer_un_par_un(destinataires, sujet, corps, type_evenement, commande=None, pieces=()):
+    """Un envoi par destinataire plutôt qu'un envoi groupé : une adresse invalide ne
+    prive pas les autres du message, et chaque issue est tracée dans EmailLog. Aucune
+    exception ne remonte. Retourne le nombre d'envois acceptés par le relais."""
     connexion = get_connection(fail_silently=False)
     envoyes = 0
     for adresse in destinataires:
         try:
             message = EmailMessage(subject=sujet, body=corps, to=[adresse], connection=connexion)
-            if pdf:
-                message.attach(f"commande_{commande.pk}.pdf", pdf, "application/pdf")
+            for nom, contenu, type_mime in pieces:
+                message.attach(nom, contenu, type_mime)
             message.send(fail_silently=False)
             EmailLog.objects.create(
                 destinataire=adresse,
-                sujet=sujet,
-                type_evenement=TypeEvenement.NOUVELLE_COMMANDE,
+                sujet=sujet[:255],
+                type_evenement=type_evenement,
                 statut_envoi=StatutEnvoi.ENVOYE,
                 commande=commande,
             )
@@ -121,11 +141,88 @@ def envoyer_email_nouvelle_commande(commande):
         except Exception as exc:  # noqa: BLE001 - on journalise toute erreur d'envoi
             EmailLog.objects.create(
                 destinataire=adresse,
-                sujet=sujet,
-                type_evenement=TypeEvenement.NOUVELLE_COMMANDE,
+                sujet=sujet[:255],
+                type_evenement=type_evenement,
                 statut_envoi=StatutEnvoi.ECHEC,
                 commande=commande,
                 detail_erreur=str(exc),
             )
-            logger.warning("Commande #%s : échec de l'email vers %s (%s)", commande.pk, adresse, exc)
+            logger.warning("%s : échec de l'email vers %s (%s)", sujet, adresse, exc)
     return envoyes
+
+
+def envoyer_email_reclamation(reclamation, rouverte=False):
+    """Prévient par e-mail les adresses cochées « Réclamations » dans Paramètres.
+
+    Seules ces adresses reçoivent les réclamations (pas tout le personnel) : c'est
+    l'admin FRPS qui choisit qui les traite. Liste vide = aucun envoi, journalisé."""
+    from django.conf import settings
+    from django.urls import reverse
+
+    destinataires = fusionner_adresses(
+        DestinataireEmail.objects.pour("recoit_reclamations").values_list("email", flat=True)
+    )
+    if not destinataires:
+        logger.warning(
+            "Réclamation #%s : aucun email envoyé, aucune adresse « Réclamations » active "
+            "dans Paramètres > E-mails.",
+            reclamation.pk,
+        )
+        return 0
+
+    fosa = reclamation.formation_sanitaire
+    lien = settings.PUBLIC_BASE_URL.rstrip("/") + reverse("reclamations:detail", args=[reclamation.pk])
+    if rouverte:
+        sujet = f"[Commande FRPS] Réclamation #{reclamation.pk} rouverte - {fosa.nom}"
+        dernier = reclamation.messages.filter(de_la_fosa=True).order_by("-date").first()
+        intro = [f"{fosa.nom} a rouvert la réclamation #{reclamation.pk} : le problème n'est pas réglé.", ""]
+        texte = dernier.texte if dernier and dernier.texte else "(photo jointe, sans texte)"
+        photos = list(dernier.photos.all()) if dernier else []
+    else:
+        sujet = f"[Commande FRPS] Nouvelle réclamation #{reclamation.pk} - {fosa.nom}"
+        intro = [f"Nouvelle réclamation #{reclamation.pk} de {fosa.nom}.", ""]
+        texte = reclamation.description
+        photos = list(reclamation.photos.filter(message__isnull=True))
+
+    localisation = " - ".join(p for p in (fosa.district, fosa.region) if p)
+    lignes = intro + [f"Motif : {reclamation.get_motif_display()}"]
+    if reclamation.commande_id:
+        lignes.append(f"Commande concernée : #{reclamation.commande_id}")
+    if localisation:
+        lignes.append(f"Localisation : {localisation}")
+    if fosa.telephone_contact:
+        lignes.append(f"Contact FOSA : {fosa.telephone_contact}")
+    lignes += ["", "Message de la FOSA :", texte, ""]
+    if photos:
+        lignes.append(f"{len(photos)} photo(s) jointe(s) à cet email.")
+    lignes += [
+        "",
+        f"Répondre ou changer le statut : {lien}",
+        "",
+        "-- ",
+        "Message automatique de l'application Commande FRPS.",
+    ]
+    pieces = [
+        (f"reclamation_{reclamation.pk}_photo_{rang}.jpg", bytes(photo.contenu), "image/jpeg")
+        for rang, photo in enumerate(photos, start=1)
+    ]
+    return envoyer_un_par_un(
+        destinataires,
+        sujet,
+        "\n".join(lignes),
+        TypeEvenement.RECLAMATION,
+        commande=reclamation.commande,
+        pieces=pieces,
+    )
+
+
+def envoyer_email_test(adresse):
+    """E-mail d'essai depuis Paramètres : prouve que l'adresse est bonne et que le
+    relais accepte l'envoi (pas qu'il est lu : vérifier aussi les indésirables)."""
+    return envoyer_un_par_un(
+        [adresse],
+        "[Commande FRPS] E-mail de test",
+        "Cette adresse est bien paramétrée pour recevoir les e-mails de l'application "
+        "Commande FRPS.\n\n-- \nMessage automatique de l'application Commande FRPS.",
+        TypeEvenement.EMAIL_TEST,
+    )

@@ -2,10 +2,30 @@
 {% block title %}Mes commandes - Commande FRPS{% endblock %}
 {% block content %}
 <h1 class="h4 app-titre mb-3">Mes commandes</h1>
-<div class="table-responsive">
-<table class="table table-striped">
+
+{# Téléphone : une carte cliquable par commande (le tableau à 7 colonnes défilait de côté). #}
+<div class="d-md-none">
+    {% for commande in commandes %}
+    <a href="{% url 'commandes:detail' commande.id %}" class="card app-carte p-3 mb-2 text-reset text-decoration-none">
+        <div class="d-flex justify-content-between align-items-start gap-2">
+            <strong>#{{ commande.id }} · {{ commande.montant_total|floatformat:"0" }} FCFA</strong>
+            {% if commande.est_effective %}{% include "commandes/_badge_etape.html" %}{% else %}<span class="badge bg-secondary">{{ commande.get_statut_display }}</span>{% endif %}
+        </div>
+        <div class="small text-muted d-flex flex-wrap gap-2 align-items-center mt-1">
+            <span>{{ commande.date_creation|date:"d/m/Y H:i" }}</span>
+            {% if commande.est_effective %}{% include "commandes/_badge_paiement.html" %}{% endif %}
+            {% if commande.preparee_hors_ligne %}<span title="Préparée hors connexion">📡 hors connexion</span>{% endif %}
+        </div>
+    </a>
+    {% empty %}
+    <p class="text-center text-muted">Aucune commande passée pour le moment.</p>
+    {% endfor %}
+</div>
+
+<div class="table-responsive d-none d-md-block">
+<table class="table table-striped align-middle">
     <thead>
-        <tr><th>#</th><th>Date</th><th>Statut</th><th>Montant</th><th>Paiement</th><th></th></tr>
+        <tr><th>#</th><th>Date</th><th>Statut</th><th>Suivi</th><th>Montant</th><th>Paiement</th><th></th></tr>
     </thead>
     <tbody>
         {% for commande in commandes %}
@@ -16,22 +36,13 @@
                 <span class="badge bg-secondary">{{ commande.get_statut_display }}</span>
                 {% if commande.preparee_hors_ligne %}<span class="small text-secondary text-nowrap" title="Préparée hors connexion">📡 hors connexion</span>{% endif %}
             </td>
-            <td>{{ commande.montant_total|floatformat:"0" }} FCFA</td>
-            <td>
-                {% if not commande.est_effective %}
-                <span class="text-secondary">-</span>
-                {% elif commande.etat_paiement == "payee" %}
-                <span class="badge bg-success">Payée</span>
-                {% elif commande.etat_paiement == "partielle" %}
-                <span class="badge bg-warning text-dark">Partielle</span>
-                {% else %}
-                <span class="badge bg-secondary">Non payée</span>
-                {% endif %}
-            </td>
+            <td>{% if commande.est_effective %}{% include "commandes/_badge_etape.html" %}{% else %}<span class="text-secondary">-</span>{% endif %}</td>
+            <td class="text-nowrap">{{ commande.montant_total|floatformat:"0" }} FCFA</td>
+            <td>{% if commande.est_effective %}{% include "commandes/_badge_paiement.html" %}{% else %}<span class="text-secondary">-</span>{% endif %}</td>
             <td><a href="{% url 'commandes:detail' commande.id %}" class="btn btn-sm btn-outline-primary">Détail</a></td>
         </tr>
         {% empty %}
-        <tr><td colspan="6" class="text-center text-muted">Aucune commande passée pour le moment.</td></tr>
+        <tr><td colspan="7" class="text-center text-muted">Aucune commande passée pour le moment.</td></tr>
         {% endfor %}
     </tbody>
 </table>

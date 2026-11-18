@@ -6,7 +6,7 @@ from django.utils import timezone
 
 from catalogue.models import Produit
 
-from .models import Commande, LigneCommande, StatutCommande
+from .models import Commande, EtapeTraitement, LigneCommande, StatutCommande
 
 logger = logging.getLogger(__name__)
 
@@ -277,3 +277,81 @@ def supprimer_commande(commande):
         ", ".join(f"{nom} +{q}" for nom, q in restaure) or "aucun (pas de débit)",
     )
     return reference
+
+
+# ---------- Suivi de la commande par le FRPS ----------
+
+_CHAMP_DATE_ETAPE = {
+    EtapeTraitement.EN_PREPARATION: "date_preparation",
+    EtapeTraitement.PRETE: "date_prete",
+    EtapeTraitement.LIVREE: "date_livraison",
+}
+
+
+def avancer_etape(commande, etape_attendue):
+    """Fait passer la commande à l'étape suivante et prévient la FOSA quand elle est prête.
+
+    `etape_attendue` : l'étape affichée sur le bouton cliqué. Si deux agents cliquent
+    en même temps, le second trouverait la commande déjà avancée et la ferait sauter
+    une étape : on refuse plutôt que d'avancer à l'aveugle."""
+    from notifications.services import notifier_commande_prete
+
+    with transaction.atomic():
+        commande = Commande.objects.select_for_update().get(pk=commande.pk)
+        suivante = commande.etape_suivante
+        if suivante is None:
+            raise ValueError(f"La commande #{commande.pk} ne peut plus avancer.")
+        if suivante != etape_attendue:
+            raise ValueError(
+                f"La commande #{commande.pk} est déjà à l'étape « {commande.get_etape_display()} ». "
+                "Rechargez la page."
+            )
+        champ_date = _CHAMP_DATE_ETAPE[suivante]
+        commande.etape = suivante
+        setattr(commande, champ_date, timezone.now())
+        commande.save(update_fields=["etape", champ_date])
+
+    if commande.etape == EtapeTraitement.PRETE:
+        try:
+            notifier_commande_prete(commande)
+        except Exception:  # noqa: BLE001 - un SMS raté ne doit pas annuler l'étape
+            logger.exception("Commande #%s : SMS « prête » non envoyé", commande.pk)
+    return commande
+
+
+# ---------- Recommander une commande passée ----------
+
+
+def recommander(commande, formation_sanitaire):
+    """Remet dans le panier les produits d'une commande passée.
+
+    Les quantités sont celles demandées à l'époque (y compris ce que le stock n'avait
+    pas permis de servir), ajoutées à ce qui est déjà au panier et plafonnées au
+    stock du moment. Retourne (ajoutés, réduits, indisponibles) : listes de noms."""
+    if commande.formation_sanitaire_id != formation_sanitaire.pk:
+        raise ValueError("Cette commande n'appartient pas à votre formation sanitaire.")
+    if commande.statut == StatutCommande.BROUILLON:
+        raise ValueError("Cette commande est encore au panier.")
+
+    panier = get_panier(formation_sanitaire)
+    deja = {ligne.produit_id: ligne.quantite for ligne in panier.lignes.all()}
+    ajoutes, reduits, indisponibles = [], [], []
+
+    with transaction.atomic():
+        for ligne in commande.lignes.select_related("produit"):
+            produit = ligne.produit
+            voulu = ligne.quantite_demandee if ligne.quantite_demandee is not None else ligne.quantite
+            if voulu <= 0:
+                continue
+            if not produit.actif or produit.stock_disponible <= 0:
+                indisponibles.append(produit.nom)
+                continue
+            total = deja.get(produit.pk, 0) + voulu
+            if total > produit.stock_disponible:
+                total = produit.stock_disponible
+                reduits.append(produit.nom)
+            else:
+                ajoutes.append(produit.nom)
+            ajouter_produit(panier, produit, total)
+
+    return ajoutes, reduits, indisponibles

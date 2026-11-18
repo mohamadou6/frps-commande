@@ -146,6 +146,39 @@ def notifier_nouvelle_commande(commande):
         logger.exception("Commande #%s : envoi des emails interrompu", commande.pk)
 
 
+def numero_international(numero):
+    """« 6XX XX XX XX » saisi à la camerounaise → « +2376XXXXXXXX ». Twilio refuse un
+    numéro sans indicatif ; celui du personnel est déjà saisi au format international,
+    mais pas forcément celui des fiches FOSA."""
+    chiffres = "".join(c for c in numero if c.isdigit())
+    if numero.strip().startswith("+"):
+        return "+" + chiffres
+    if chiffres.startswith("00"):
+        return "+" + chiffres[2:]
+    if len(chiffres) == 9:
+        return "+237" + chiffres
+    if len(chiffres) == 12 and chiffres.startswith("237"):
+        return "+" + chiffres
+    return numero.strip()
+
+
+def notifier_commande_prete(commande):
+    """SMS à la FOSA quand le personnel stock marque sa commande « prête ».
+
+    Numéro de contact de la fiche, sinon celui du compte. Sans numéro, rien ne part :
+    c'est journalisé, la FOSA verra l'étape dans l'application."""
+    fosa = commande.formation_sanitaire
+    numero = fosa.telephone_contact or fosa.user.telephone
+    if not numero:
+        logger.warning("Commande #%s prête : %s n'a aucun numéro, SMS non envoyé", commande.pk, fosa.nom)
+        return
+    message = _sans_accents(
+        f"FRPS-NO : votre commande #{commande.pk} ({formater_montant(commande.montant_total)} FCFA) "
+        "est prete."
+    )
+    _envoyer_a_destinataires([numero_international(numero)], message, TypeEvenement.COMMANDE_PRETE, commande=commande)
+
+
 def notifier_paiement_confirme(commande):
     """En pause depuis le retrait de l'étape paiement du parcours FOSA (2026-07-26) :
     plus aucune vue n'appelle cette fonction en usage normal, l'app paiements n'étant

@@ -18,6 +18,22 @@ class StatutCommande(models.TextChoices):
     EN_ATTENTE_SYNCHRO = "attente_synchro", "En attente de validation"
 
 
+class EtapeTraitement(models.TextChoices):
+    """Où en est le FRPS avec une commande validée. Distinct du statut : le statut
+    dit si le stock a été débité (et sert au stock, aux statistiques et à la
+    suppression), l'étape dit seulement où en est la préparation."""
+
+    RECUE = "recue", "Reçue par le FRPS"
+    EN_PREPARATION = "en_preparation", "En préparation"
+    PRETE = "prete", "Prête"
+    LIVREE = "livree", "Livrée"
+
+
+# Ordre imposé : le personnel ne fait qu'avancer d'une étape à la fois. Une erreur se
+# corrige dans l'admin Django.
+ORDRE_ETAPES = [EtapeTraitement.RECUE, EtapeTraitement.EN_PREPARATION, EtapeTraitement.PRETE, EtapeTraitement.LIVREE]
+
+
 class Commande(models.Model):
     formation_sanitaire = models.ForeignKey(
         "accounts.FormationSanitaire", on_delete=models.PROTECT, related_name="commandes"
@@ -32,6 +48,10 @@ class Commande(models.Model):
     # unique fait qu'un renvoi retrouve la commande déjà créée au lieu d'en créer une
     # seconde et de débiter le stock deux fois. Vide pour une commande passée en ligne.
     uuid_client = models.UUIDField(null=True, blank=True, unique=True, editable=False)
+    etape = models.CharField(max_length=16, choices=EtapeTraitement.choices, default=EtapeTraitement.RECUE)
+    date_preparation = models.DateTimeField(null=True, blank=True)
+    date_prete = models.DateTimeField(null=True, blank=True)
+    date_livraison = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         verbose_name = "Commande"
@@ -59,6 +79,34 @@ class Commande(models.Model):
     def est_effective(self):
         """Commande qui a débité le stock : la seule qui ait un bon (PDF) et un paiement."""
         return self.statut in (StatutCommande.CONFIRMEE, StatutCommande.PAYEE)
+
+    @property
+    def etape_suivante(self):
+        """Étape à laquelle le personnel peut faire passer la commande, ou None."""
+        if not self.est_effective:
+            return None
+        rang = ORDRE_ETAPES.index(self.etape)
+        return ORDRE_ETAPES[rang + 1] if rang + 1 < len(ORDRE_ETAPES) else None
+
+    @property
+    def etape_suivante_libelle(self):
+        suivante = self.etape_suivante
+        return EtapeTraitement(suivante).label if suivante else ""
+
+    @property
+    def etapes_suivi(self):
+        """Pour la frise de la FOSA : [(libellé, date ou None, atteinte), …]."""
+        dates = {
+            EtapeTraitement.RECUE: self.date_confirmation,
+            EtapeTraitement.EN_PREPARATION: self.date_preparation,
+            EtapeTraitement.PRETE: self.date_prete,
+            EtapeTraitement.LIVREE: self.date_livraison,
+        }
+        rang_actuel = ORDRE_ETAPES.index(self.etape)
+        return [
+            (EtapeTraitement(etape).label, dates[etape], rang <= rang_actuel)
+            for rang, etape in enumerate(ORDRE_ETAPES)
+        ]
 
     @property
     def montant_paye(self):

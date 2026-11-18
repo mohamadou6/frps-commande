@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}Réclamations - Commande FRPS{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-1">
+    <h1 class="h4 app-titre mb-0">{% if user.is_formation_sanitaire %}Mes réclamations{% else %}Réclamations des FOSA{% endif %}</h1>
+    {% if user.is_formation_sanitaire %}
+    <a href="{% url 'reclamations:nouvelle' %}" class="btn btn-primary">➕ Nouvelle réclamation</a>
+    {% endif %}
+</div>
+<p class="app-sous-titre text-muted small mb-3">
+    {% if user.is_formation_sanitaire %}
+    Un produit manquant, abîmé, une quantité ou une facture incorrecte ? Signalez-le ici et suivez la réponse du FRPS.
+    {% else %}
+    Répondez aux formations sanitaires et changez le statut au fil du traitement. Quand une réclamation passe à
+    « Résolue », la formation sanitaire est prévenue par SMS.
+    {% endif %}
+</p>
+
+{% if sans_destinataire_email %}
+<div class="alert alert-warning small">
+    ✉️ Aucune adresse ne reçoit les réclamations par e-mail.
+    <a href="{% url 'notifications:parametres_emails' %}" class="alert-link">Paramétrer les e-mails</a>
+</div>
+{% endif %}
+{% if not user.is_formation_sanitaire %}
+<div class="filtres-puces mb-3" role="group" aria-label="Filtrer par statut">
+    {% for code, libelle, nombre in filtres %}
+    <a href="?statut={{ code }}{% if query %}&q={{ query|urlencode }}{% endif %}"
+       class="btn btn-sm {% if filtre == code %}btn-primary{% else %}btn-outline-secondary{% endif %}"
+       {% if filtre == code %}aria-current="page"{% endif %}>
+        {{ libelle }}{% if nombre is not None %} <span class="badge bg-body-secondary text-body-secondary">{{ nombre }}</span>{% endif %}
+    </a>
+    {% endfor %}
+</div>
+<form method="get" class="row g-2 mb-3">
+    <input type="hidden" name="statut" value="{{ filtre }}">
+    <div class="col-auto flex-grow-1">
+        <input type="search" name="q" value="{{ query }}" placeholder="Rechercher une formation sanitaire..."
+               class="form-control champ-recherche">
+    </div>
+    <div class="col-auto"><button type="submit" class="btn btn-outline-primary">Rechercher</button></div>
+</form>
+{% endif %}
+
+{# Téléphone : une carte cliquable par réclamation. #}
+<div class="d-md-none">
+    {% for reclamation in reclamations %}
+    <a href="{% url 'reclamations:detail' reclamation.id %}" class="card app-carte p-3 mb-2 text-reset text-decoration-none">
+        <div class="d-flex justify-content-between align-items-start gap-2">
+            <strong>
+                #{{ reclamation.id }} · {{ reclamation.get_motif_display }}
+                {% if user.is_formation_sanitaire and reclamation.non_lue_fosa or not user.is_formation_sanitaire and reclamation.non_lue_frps %}
+                <span class="badge bg-danger">Nouveau</span>
+                {% endif %}
+            </strong>
+            {% include "reclamations/_badge_statut.html" %}
+        </div>
+        <div class="small text-muted">
+            {% if not user.is_formation_sanitaire %}🏥 {{ reclamation.formation_sanitaire.nom }} · {% endif %}
+            {% if reclamation.commande_id %}Commande #{{ reclamation.commande_id }} · {% endif %}
+            {{ reclamation.date_activite|date:"d/m/Y H:i" }}
+        </div>
+    </a>
+    {% empty %}
+    <p class="text-center text-muted">Aucune réclamation{% if not user.is_formation_sanitaire %} à ce statut{% endif %}.</p>
+    {% endfor %}
+</div>
+
+<div class="table-responsive d-none d-md-block">
+<table class="table table-striped align-middle">
+    <thead>
+        <tr>
+            <th>#</th>
+            {% if not user.is_formation_sanitaire %}<th>Formation sanitaire</th>{% endif %}
+            <th>Motif</th><th>Commande</th><th>Statut</th><th>Dernière activité</th><th></th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for reclamation in reclamations %}
+        <tr>
+            <td>{{ reclamation.id }}</td>
+            {% if not user.is_formation_sanitaire %}<td>{{ reclamation.formation_sanitaire.nom }}</td>{% endif %}
+            <td>
+                {{ reclamation.get_motif_display }}
+                {% if user.is_formation_sanitaire and reclamation.non_lue_fosa or not user.is_formation_sanitaire and reclamation.non_lue_frps %}
+                <span class="badge bg-danger">Nouveau</span>
+                {% endif %}
+            </td>
+            <td>{% if reclamation.commande_id %}#{{ reclamation.commande_id }}{% else %}<span class="text-secondary">-</span>{% endif %}</td>
+            <td>{% include "reclamations/_badge_statut.html" %}</td>
+            <td class="text-nowrap">{{ reclamation.date_activite|date:"d/m/Y H:i" }}</td>
+            <td><a href="{% url 'reclamations:detail' reclamation.id %}" class="btn btn-sm btn-outline-primary">Ouvrir</a></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7" class="text-center text-muted">Aucune réclamation{% if not user.is_formation_sanitaire %} à ce statut{% endif %}.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+</div>
+{% endblock %}

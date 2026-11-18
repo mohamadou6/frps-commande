@@ -1,0 +1,10 @@
+{% if photos %}
+<div class="photos-jointes">
+    {% for photo in photos %}
+    <a href="{% url 'reclamations:photo' photo.pk %}" target="_blank" rel="noopener" title="Agrandir la photo">
+        <img src="{% url 'reclamations:photo' photo.pk %}" alt="Photo jointe {{ forloop.counter }}"
+             width="{{ photo.largeur }}" height="{{ photo.hauteur }}" loading="lazy">
+    </a>
+    {% endfor %}
+</div>
+{% endif %}

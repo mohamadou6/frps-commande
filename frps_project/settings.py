@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     'paiements',
     'stock_sync',
     'statistiques',
+    'reclamations',
 ]
 
 AUTH_USER_MODEL = 'accounts.User'
@@ -75,6 +76,7 @@ TEMPLATES = [
                 'django.contrib.messages.context_processors.messages',
                 'notifications.context_processors.notifications_non_lues',
                 'commandes.context_processors.panier_resume',
+                'reclamations.context_processors.reclamations_non_lues',
             ],
         },
     },

@@ -1,0 +1,1 @@
+{% if reclamation.statut == "resolue" %}<span class="badge bg-success">{{ reclamation.get_statut_display }}</span>{% elif reclamation.statut == "en_cours" %}<span class="badge bg-warning text-dark">{{ reclamation.get_statut_display }}</span>{% else %}<span class="badge bg-danger">{{ reclamation.get_statut_display }}</span>{% endif %}

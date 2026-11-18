@@ -1,6 +1,15 @@
 from django.contrib import admin
 
-from .models import EmailLog, Notification, PushSubscription, SMSLog, WhatsAppLog
+from .models import DestinataireEmail, EmailLog, Notification, PushSubscription, SMSLog, WhatsAppLog
+
+
+@admin.register(DestinataireEmail)
+class DestinataireEmailAdmin(admin.ModelAdmin):
+    """Aussi modifiable dans l'application : Paramètres > E-mails."""
+
+    list_display = ("email", "nom", "actif", "recoit_reclamations", "recoit_commandes", "recoit_rapports")
+    list_editable = ("actif", "recoit_reclamations", "recoit_commandes", "recoit_rapports")
+    search_fields = ("email", "nom")
 
 
 @admin.register(SMSLog)

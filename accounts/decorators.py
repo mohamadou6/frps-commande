@@ -78,6 +78,20 @@ def comptabilite_frps_required(view_func):
     return wrapper
 
 
+def stock_frps_required(view_func):
+    """Réservé au personnel stock et à l'admin FRPS : avancer une commande dans sa
+    préparation. La comptabilité consulte le suivi sans pouvoir le changer."""
+
+    @login_required
+    @wraps(view_func)
+    def wrapper(request, *args, **kwargs):
+        if request.user.role not in (Role.ADMIN, Role.PERSONNEL_STOCK):
+            raise PermissionDenied("Réservé au personnel stock FRPS.")
+        return view_func(request, *args, **kwargs)
+
+    return wrapper
+
+
 def formation_sanitaire_only_required(view_func):
     """Réservé aux comptes ayant un vrai profil FormationSanitaire (panier, commandes,
     paiements). Contrairement à formation_sanitaire_required, l'admin FRPS n'a PAS

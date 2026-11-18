@@ -1,0 +1,12 @@
+{% comment %}
+Champ « photos » commun aux formulaires de réclamation. Sans `capture` : le téléphone
+propose lui-même l'appareil photo ou la galerie. js/photos.js réduit les photos avant
+l'envoi (réseau lent des FOSA) et affiche les vignettes ; sans lui, le formulaire part
+quand même et le serveur réduit.
+{% endcomment %}
+<div class="mb-3">
+    <label for="photos" class="form-label">📷 Photos <span class="text-muted small">(facultatif, {{ photos_max }} au maximum)</span></label>
+    <input type="file" name="photos" id="photos" class="form-control" accept="image/*" multiple
+           data-photos data-photos-max="{{ photos_max }}">
+    <div class="photos-apercu" data-photos-apercu></div>
+</div>

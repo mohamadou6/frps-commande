@@ -55,10 +55,14 @@ def _formatter_rapport_texte(donnees):
 
 
 def destinataires_rapport():
-    """Comptes admin actifs avec un email renseigné. Reproduit le même filtre que
-    les notifications SMS (voir notifications/services.py) : l'admin supervise tout."""
-    return list(
-        User.objects.filter(role=Role.ADMIN, is_active=True).exclude(email="").values_list("email", flat=True)
+    """Comptes admin actifs avec un email renseigné (l'admin supervise tout), plus les
+    adresses cochées « Rapport d'activité » dans Paramètres."""
+    from notifications.emails import fusionner_adresses
+    from notifications.models import DestinataireEmail
+
+    return fusionner_adresses(
+        User.objects.filter(role=Role.ADMIN, is_active=True).exclude(email="").values_list("email", flat=True),
+        DestinataireEmail.objects.pour("recoit_rapports").values_list("email", flat=True),
     )
 
 

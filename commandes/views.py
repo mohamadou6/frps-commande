@@ -11,13 +11,14 @@ from accounts.decorators import (
     admin_frps_required,
     formation_sanitaire_only_required,
     personnel_frps_required,
+    stock_frps_required,
 )
 from catalogue.models import Produit
 from frps_project.formatage import formater_montant, formater_prix
 from notifications.pdf import generer_pdf_commande, verifier_token_pdf
 
 from . import services
-from .models import Commande, StatutCommande
+from .models import Commande, EtapeTraitement, StatutCommande
 
 
 @formation_sanitaire_only_required
@@ -281,3 +282,98 @@ def supprimer(request, commande_id):
     services.supprimer_commande(commande)
     messages.success(request, f"Commande {libelle} supprimée. Le stock a été remis.")
     return redirect(request.POST.get("suivant") or "statistiques:index")
+
+
+@formation_sanitaire_only_required
+@require_POST
+def recommander(request, commande_id):
+    commande = get_object_or_404(
+        Commande, pk=commande_id, formation_sanitaire=request.user.formation_sanitaire
+    )
+    try:
+        ajoutes, reduits, indisponibles = services.recommander(commande, request.user.formation_sanitaire)
+    except ValueError as exc:
+        messages.error(request, str(exc))
+        return redirect("commandes:detail", commande_id=commande.pk)
+
+    if ajoutes or reduits:
+        messages.success(
+            request,
+            f"{len(ajoutes) + len(reduits)} produit(s) de la commande #{commande.pk} remis au panier. "
+            "Vérifiez les quantités avant de valider.",
+        )
+    if reduits:
+        messages.warning(request, "Quantité réduite au stock disponible : " + ", ".join(reduits) + ".")
+    if indisponibles:
+        messages.warning(request, "Plus disponible(s) : " + ", ".join(indisponibles) + ".")
+    if not (ajoutes or reduits):
+        messages.error(request, "Aucun produit de cette commande n'est disponible actuellement.")
+        return redirect("commandes:detail", commande_id=commande.pk)
+    return redirect("commandes:panier")
+
+
+ETAPES_A_TRAITER = [EtapeTraitement.RECUE, EtapeTraitement.EN_PREPARATION, EtapeTraitement.PRETE]
+
+
+@personnel_frps_required
+def suivi(request):
+    """Commandes validées et leur étape de préparation. Par défaut, celles qui ne sont
+    pas encore livrées : c'est la liste de travail du personnel stock."""
+    filtre = request.GET.get("etape", "a_traiter")
+    query = request.GET.get("q", "").strip()
+    commandes = (
+        Commande.objects.filter(statut__in=[StatutCommande.CONFIRMEE, StatutCommande.PAYEE])
+        .select_related("formation_sanitaire")
+        .order_by("date_confirmation")
+    )
+    if filtre == "a_traiter":
+        commandes = commandes.filter(etape__in=ETAPES_A_TRAITER)
+    elif filtre in EtapeTraitement.values:
+        commandes = commandes.filter(etape=filtre)
+    else:
+        filtre = "toutes"
+        commandes = commandes.order_by("-date_confirmation")
+    if filtre == EtapeTraitement.LIVREE:
+        commandes = commandes.order_by("-date_livraison")
+    if query:
+        commandes = commandes.filter(formation_sanitaire__nom__icontains=query)
+
+    base = Commande.objects.filter(statut__in=[StatutCommande.CONFIRMEE, StatutCommande.PAYEE])
+    compteurs = {etape: base.filter(etape=etape).count() for etape in EtapeTraitement.values}
+    # « Reçue par le FRPS » parle à la FOSA ; pour le personnel, ce sont les commandes
+    # qui attendent d'être préparées. Avec l'ancien libellé, un compteur retombé à 0
+    # dès la mise en préparation faisait croire que rien n'arrivait.
+    libelles = dict(EtapeTraitement.choices) | {EtapeTraitement.RECUE: "Nouvelles"}
+    filtres = [("a_traiter", "À traiter", sum(compteurs[e] for e in ETAPES_A_TRAITER))] + [
+        (etape, libelles[etape], compteurs[etape]) for etape in EtapeTraitement.values
+    ] + [("toutes", "Toutes", None)]
+    return render(
+        request,
+        "commandes/suivi.html",
+        {
+            "commandes": commandes[:200],
+            "filtre": filtre,
+            "filtres": filtres,
+            "query": query,
+            "peut_avancer": request.user.role in ("admin", "personnel_stock"),
+        },
+    )
+
+
+@stock_frps_required
+@require_POST
+def avancer_etape(request, commande_id):
+    commande = get_object_or_404(Commande, pk=commande_id)
+    try:
+        commande = services.avancer_etape(commande, request.POST.get("etape", ""))
+    except ValueError as exc:
+        messages.error(request, str(exc))
+    else:
+        texte = f"Commande #{commande.pk} : {commande.get_etape_display().lower()}."
+        if commande.etape == EtapeTraitement.PRETE:
+            texte += f" {commande.formation_sanitaire.nom} est prévenue par SMS."
+        messages.success(request, texte)
+    suivant = request.POST.get("suivant", "")
+    if not suivant.startswith("/") or suivant.startswith("//"):
+        suivant = reverse("commandes:suivi")
+    return redirect(suivant)

@@ -12,8 +12,8 @@ class LigneCommandeInline(admin.TabularInline):
 
 @admin.register(Commande)
 class CommandeAdmin(admin.ModelAdmin):
-    list_display = ("id", "formation_sanitaire", "statut", "montant_total", "date_creation", "date_confirmation")
-    list_filter = ("statut",)
+    list_display = ("id", "formation_sanitaire", "statut", "etape", "montant_total", "date_creation", "date_confirmation")
+    list_filter = ("statut", "etape")
     search_fields = ("formation_sanitaire__nom",)
     # uuid_client : renseigné pour une commande préparée hors connexion sur le téléphone.
     readonly_fields = ("montant_total", "date_creation", "date_confirmation", "uuid_client")

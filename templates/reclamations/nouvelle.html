@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Nouvelle réclamation - Commande FRPS{% endblock %}
+{% block extra_head %}<script src="{% static 'js/photos.js' %}" defer></script>{% endblock %}
+{% block content %}
+<h1 class="h4 app-titre mb-1">Nouvelle réclamation</h1>
+<p class="app-sous-titre text-muted small mb-3">Décrivez le problème : le FRPS vous répondra dans l'application.</p>
+
+<form method="post" enctype="multipart/form-data" class="app-carte p-3" style="max-width: 640px;">
+    {% csrf_token %}
+    <div class="mb-3">
+        <label for="motif" class="form-label">Motif</label>
+        <select name="motif" id="motif" class="form-select" required>
+            <option value="">— Choisir —</option>
+            {% for code, libelle in motifs %}
+            <option value="{{ code }}"{% if valeurs.motif == code %} selected{% endif %}>{{ libelle }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="mb-3">
+        <label for="commande" class="form-label">Commande concernée <span class="text-muted small">(facultatif)</span></label>
+        <select name="commande" id="commande" class="form-select">
+            <option value="">Aucune commande précise</option>
+            {% for commande in commandes %}
+            <option value="{{ commande.id }}"{% if valeurs.commande == commande.id|stringformat:"d" %} selected{% endif %}>
+                #{{ commande.id }} du {{ commande.date_creation|date:"d/m/Y" }} — {{ commande.montant_total|floatformat:"0" }} FCFA
+            </option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="mb-3">
+        <label for="description" class="form-label">Description</label>
+        <textarea name="description" id="description" rows="5" maxlength="4000" class="form-control" required
+                  placeholder="Ex. : 2 boîtes d'amoxicilline manquaient à la réception.">{{ valeurs.description }}</textarea>
+    </div>
+    {% include "reclamations/_champ_photos.html" %}
+    <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary">Envoyer la réclamation</button>
+        <a href="{% url 'reclamations:liste' %}" class="btn btn-outline-secondary">Annuler</a>
+    </div>
+</form>
+{% endblock %}

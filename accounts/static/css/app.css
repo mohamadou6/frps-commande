@@ -207,10 +207,34 @@ a.card:hover {
 /* Ordinateur : la barre du personnel (six menus, le nom, la déconnexion) débordait
    de l'écran. Liens un peu resserrés, nom trop long abrégé. */
 @media (min-width: 1200px) {
-    .app-navbar #navPrincipale > div { gap: .35rem !important; }
-    .app-navbar .nav-link { padding: .4rem .65rem !important; }
+    .app-navbar #navPrincipale > div { gap: .3rem !important; }
+    .app-navbar .nav-link { padding: .4rem .6rem !important; }
     .app-navbar .user-pill { max-width: 15rem; }
 }
+/* La barre prend la largeur de l'écran (jusqu'à 1 680 px) et non les 1 140 px du
+   contenu : avec Suivi et Réclamations, celle du personnel débordait. */
+.conteneur-nav { max-width: 1680px; padding-inline: 1rem; }
+@media (min-width: 1200px) { .conteneur-nav { padding-inline: 1.5rem; } }
+/* Libellés abrégés et icônes seules entre 1 200 et 1 600 px ; en entier au-delà, et
+   dans le panneau du téléphone (sous 1 200 px), où la place ne manque pas. */
+.libelle-court, .icone-deconnexion { display: none; }
+@media (min-width: 1200px) and (max-width: 1599.98px) {
+    .nav-personnel .libelle-long, .nav-personnel .libelle-deconnexion { display: none; }
+    .nav-personnel .libelle-court, .nav-personnel .icone-deconnexion { display: inline; }
+    .nav-personnel .bouton-deconnexion { width: 2.1rem; height: 2.1rem; padding: 0; font-size: 1rem; line-height: 1; }
+}
+@media (min-width: 1200px) and (max-width: 1399.98px) {
+    /* Le rôle et l'initiale suffisent : le nom complet reste au survol (title). */
+    .nav-personnel .user-pill .user-nom { display: none; }
+    .nav-personnel .user-pill { padding-right: .5rem; }
+}
+@media (min-width: 1200px) and (max-width: 1299.98px) {
+    .nav-personnel #navPrincipale > div { gap: .15rem !important; }
+    .nav-personnel .nav-link { padding: .4rem .45rem !important; }
+    .nav-personnel .conteneur-nav { padding-inline: 1rem; }
+}
+.app-navbar .nav-icone { font-size: 1.05rem; }
+.app-navbar .nav-icone .badge { font-size: .65rem; }
 .app-navbar .user-pill .user-nom {
     min-width: 0;
     overflow: hidden;
@@ -914,6 +938,99 @@ a.card:hover {
 /* Détail d'une commande : quantité servie inférieure à la demande. */
 .quantite-reduite { color: var(--app-texte-rouge); font-weight: 600; }
 
+/* ---------- Suivi de commande (frise de la FOSA) ---------- */
+.suivi-etapes {
+    list-style: none;
+    padding: 14px 12px;
+    display: flex;
+    gap: 4px;
+    background: var(--app-surface);
+    border-radius: 16px;
+    box-shadow: var(--app-ombre);
+}
+.suivi-etapes li {
+    flex: 1 1 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    position: relative;
+    color: var(--app-texte-2);
+    font-size: .8rem;
+    min-width: 0;
+}
+/* Trait entre deux points : vert jusqu'à l'étape atteinte. */
+.suivi-etapes li + li::before {
+    content: "";
+    position: absolute;
+    top: 7px;
+    right: 50%;
+    width: 100%;
+    height: 3px;
+    background: var(--app-bordure-2);
+    z-index: 0;
+}
+.suivi-etapes li.atteinte + li.atteinte::before { background: var(--app-vert); }
+.suivi-point {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--app-surface);
+    border: 3px solid var(--app-bordure-2);
+    position: relative;
+    z-index: 1;
+    margin-bottom: 4px;
+}
+.suivi-etapes li.atteinte { color: var(--app-texte); }
+.suivi-etapes li.atteinte .suivi-point { background: var(--app-vert); border-color: var(--app-vert); }
+.suivi-etapes li.atteinte .suivi-libelle { font-weight: 600; }
+.suivi-date { font-size: .72rem; color: var(--app-texte-2); }
+
+/* ---------- Réclamations : fil de messages ---------- */
+.fil-reclamation { display: flex; flex-direction: column; gap: 10px; max-width: 720px; }
+.bulle {
+    padding: 10px 14px;
+    border-radius: 16px;
+    max-width: 88%;
+    overflow-wrap: anywhere;
+    box-shadow: var(--app-ombre);
+}
+.bulle-fosa { align-self: flex-start; background: var(--app-surface); border-bottom-left-radius: 4px; }
+.bulle-frps { align-self: flex-end; background: var(--app-teinte-vert); border-bottom-right-radius: 4px; }
+.bulle-entete { font-size: .75rem; color: var(--app-texte-2); margin-bottom: 2px; }
+
+/* Filtres en pastilles (Suivi, Réclamations) : une seule ligne qui défile au doigt
+   sur téléphone, au lieu de trois lignes de boutons qui repoussaient la liste. */
+.filtres-puces { display: flex; flex-wrap: wrap; gap: .5rem; }
+@media (max-width: 767.98px) {
+    .filtres-puces {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        scrollbar-width: none;
+        /* Va jusqu'aux bords de l'écran : même valeur que la marge du .container. */
+        margin-inline: calc(var(--bs-gutter-x, 1.5rem) * -.5);
+        padding-inline: calc(var(--bs-gutter-x, 1.5rem) * .5);
+        padding-bottom: 2px;
+    }
+    .filtres-puces::-webkit-scrollbar { display: none; }
+    .filtres-puces > * { flex-shrink: 0; }
+}
+.champ-recherche { max-width: 400px; }
+
+/* Laisse un élément flexible rétrécir (sinon text-truncate ne coupe rien). */
+.min-w-0 { min-width: 0; }
+
+/* Photos jointes : vignettes dans le fil, aperçu avant envoi. */
+.photos-jointes, .photos-apercu { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.photos-jointes img, .photos-apercu img {
+    width: 96px;
+    height: 96px;
+    object-fit: cover;
+    border-radius: 10px;
+    border: 1px solid var(--app-bordure);
+    background: var(--app-surface);
+}
+
 /* ---------- Panier ---------- */
 .quantite-panier {
     width: 78px;
@@ -1112,8 +1229,8 @@ a.card:hover {
 }
 /* Le logo garde son fond blanc dans les deux modes : c'est une plaque, pas un fond. */
 .login-logo {
-    width: 132px;
-    height: 82px;
+    width: 128px;
+    height: 116px;
     border-radius: 20px;
     margin: 0 auto 1.1rem;
     display: flex;
@@ -1123,7 +1240,7 @@ a.card:hover {
     box-shadow: 0 10px 22px -10px rgba(11, 61, 36, 0.35);
     border: 1px solid #eef4f0;
 }
-.login-logo svg { width: 112px; height: 62px; }
+.login-logo img { width: 110px; height: 98px; object-fit: contain; }
 .login-brand {
     text-align: center;
     margin-bottom: 1.75rem;

@@ -1,6 +1,7 @@
 import json
 import logging
 
+from django.conf import settings
 from django.contrib import messages
 from django.db.models import Q
 from django.http import Http404, HttpResponse
@@ -9,10 +10,11 @@ from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
-from accounts.decorators import personnel_frps_required
+from accounts.decorators import admin_frps_required, personnel_frps_required
 from accounts.models import Role
 
-from .models import Notification, PushSubscription, SMSLog
+from . import parametres
+from .models import ENVOIS_PARAMETRABLES, DestinataireEmail, EmailLog, Notification, PushSubscription, SMSLog
 from .push import envoyer_push_a_abonnement
 
 logger = logging.getLogger("notifications.sms")
@@ -202,3 +204,110 @@ def twilio_status_callback(request):
             logger.warning("Twilio DLR: aucun SMSLog trouve pour sid=%s", sid)
 
     return HttpResponse(status=200)
+
+
+# ---------- Paramètres : destinataires des e-mails ----------
+
+
+@admin_frps_required
+def parametres_emails(request):
+    if request.method == "POST":
+        try:
+            destinataire = parametres.ajouter_destinataire(
+                request.POST.get("email"), request.POST.get("nom"), request.POST.getlist("envois")
+            )
+        except ValueError as exc:
+            messages.error(request, str(exc))
+        else:
+            messages.success(request, f"{destinataire.email} ajoutée.")
+            return redirect("notifications:parametres_emails")
+
+    from accounts.models import User
+
+    envois = []
+    for champ, libelle, aide in ENVOIS_PARAMETRABLES:
+        envois.append(
+            {
+                "champ": champ,
+                "libelle": libelle,
+                "aide": aide,
+                "nb_actifs": DestinataireEmail.objects.pour(champ).count(),
+            }
+        )
+    return render(
+        request,
+        "notifications/parametres_emails.html",
+        {
+            "destinataires": DestinataireEmail.objects.all(),
+            "envois": envois,
+            # Ils reçoivent déjà les commandes (et le rapport pour l'admin) sans figurer
+            # dans la liste : on les montre pour éviter de les ajouter en double.
+            "comptes_avec_email": User.objects.filter(is_active=True)
+            .exclude(role=Role.FORMATION_SANITAIRE)
+            .exclude(email="")
+            .order_by("username"),
+            "derniers_envois": EmailLog.objects.filter(
+                type_evenement__in=["reclamation", "email_test", "nouvelle_commande"]
+            )[:10],
+            "envoi_reel": envoi_email_reel(),
+            "saisie": {
+                "email": request.POST.get("email", ""),
+                "nom": request.POST.get("nom", ""),
+                "envois": request.POST.getlist("envois") if request.method == "POST" else ["recoit_reclamations"],
+            },
+        },
+    )
+
+
+@admin_frps_required
+@require_POST
+def modifier_destinataire_email(request, destinataire_id):
+    destinataire = get_object_or_404(DestinataireEmail, pk=destinataire_id)
+    try:
+        parametres.modifier_destinataire(
+            destinataire, request.POST.get("actif") == "1", request.POST.getlist("envois")
+        )
+    except ValueError as exc:
+        messages.error(request, str(exc))
+    else:
+        messages.success(request, f"{destinataire.email} enregistrée.")
+    return redirect("notifications:parametres_emails")
+
+
+@admin_frps_required
+@require_POST
+def supprimer_destinataire_email(request, destinataire_id):
+    destinataire = get_object_or_404(DestinataireEmail, pk=destinataire_id)
+    destinataire.delete()
+    messages.success(request, f"{destinataire.email} retirée de la liste.")
+    return redirect("notifications:parametres_emails")
+
+
+@admin_frps_required
+@require_POST
+def tester_destinataire_email(request, destinataire_id):
+    from .emails import envoyer_email_test
+
+    destinataire = get_object_or_404(DestinataireEmail, pk=destinataire_id)
+    if not envoyer_email_test(destinataire.email):
+        messages.error(request, f"L'envoi à {destinataire.email} a échoué (détail dans les derniers e-mails).")
+    elif not envoi_email_reel():
+        messages.warning(
+            request,
+            f"Mode test : l'e-mail pour {destinataire.email} a seulement été affiché dans la console du "
+            "serveur, pas envoyé. Il partira vraiment une fois l'application en ligne.",
+        )
+    else:
+        messages.success(
+            request,
+            f"E-mail de test envoyé à {destinataire.email}. S'il n'arrive pas dans quelques minutes, "
+            "regarder dans les indésirables, puis vérifier l'adresse.",
+        )
+    return redirect("notifications:parametres_emails")
+
+
+def envoi_email_reel():
+    """Faux en local (EMAIL_BACKEND_MODE=console, ou tests) : les e-mails sont alors
+    « acceptés » par la console sans jamais partir. Sans ce signal, la page affichait
+    « Envoyé » et faisait croire à une panne (constaté le 2026-11-18)."""
+    return settings.EMAIL_BACKEND == "django.core.mail.backends.smtp.EmailBackend"

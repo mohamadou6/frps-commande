@@ -5,6 +5,10 @@ from django.db import models
 class TypeEvenement(models.TextChoices):
     NOUVELLE_COMMANDE = "nouvelle_commande", "Nouvelle commande"
     PAIEMENT_CONFIRME = "paiement_confirme", "Paiement confirmé"
+    COMMANDE_PRETE = "commande_prete", "Commande prête (SMS à la FOSA)"
+    RECLAMATION_RESOLUE = "reclamation_resolue", "Réclamation résolue (SMS à la FOSA)"
+    RECLAMATION = "reclamation", "Réclamation (e-mail au FRPS)"
+    EMAIL_TEST = "email_test", "E-mail de test (Paramètres)"
 
 
 class StatutEnvoi(models.TextChoices):
@@ -151,3 +155,44 @@ class PushSubscription(models.Model):
 
     def __str__(self):
         return f"Abonnement push de {self.user}"
+
+
+class DestinataireEmailQuerySet(models.QuerySet):
+    def pour(self, champ):
+        """Adresses actives abonnées à un envoi : `champ` est l'un des drapeaux recoit_*."""
+        return self.filter(actif=True, **{champ: True})
+
+
+class DestinataireEmail(models.Model):
+    """Adresse e-mail paramétrée par l'admin FRPS depuis l'application (Paramètres).
+
+    Indépendante des comptes utilisateurs : on peut y mettre une boîte de service ou
+    quelqu'un qui n'a pas de compte. Pour les commandes et le rapport, ces adresses
+    S'AJOUTENT aux comptes du personnel qui ont un e-mail ; pour les réclamations,
+    ce sont les seules destinataires."""
+
+    email = models.EmailField(unique=True)
+    nom = models.CharField(max_length=100, blank=True, help_text="Ex. : Service qualité, Pharmacien chef")
+    actif = models.BooleanField(default=True)
+    recoit_commandes = models.BooleanField("Nouvelles commandes", default=False)
+    recoit_reclamations = models.BooleanField("Réclamations", default=True)
+    recoit_rapports = models.BooleanField("Rapport d'activité", default=False)
+    date_ajout = models.DateTimeField(auto_now_add=True)
+
+    objects = DestinataireEmailQuerySet.as_manager()
+
+    class Meta:
+        verbose_name = "Destinataire e-mail"
+        verbose_name_plural = "Destinataires e-mail"
+        ordering = ["email"]
+
+    def __str__(self):
+        return f"{self.nom} <{self.email}>" if self.nom else self.email
+
+
+# Envois paramétrables : (champ du modèle, libellé, explication affichée sur la page).
+ENVOIS_PARAMETRABLES = [
+    ("recoit_reclamations", "Réclamations", "Chaque nouvelle réclamation d'une FOSA, et toute réclamation qu'elle rouvre."),
+    ("recoit_commandes", "Nouvelles commandes", "Chaque commande validée, bon de commande PDF joint."),
+    ("recoit_rapports", "Rapport d'activité", "Le rapport périodique (commandes, montants, ruptures)."),
+]

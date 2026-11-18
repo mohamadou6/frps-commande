@@ -51,7 +51,8 @@
 {% if user.is_authenticated %}
 {% with ns=request.resolver_match.namespace nom=request.resolver_match.url_name %}
 <nav class="navbar navbar-expand-xl navbar-dark app-navbar mb-4{% if not user.is_formation_sanitaire %} nav-personnel{% endif %}">
-    <div class="container">
+    {# Plus large que le contenu : la barre du personnel ne tient pas dans les 1 140 px d'un « container ». #}
+    <div class="container-fluid conteneur-nav">
         <a class="navbar-brand text-white" href="{% if not user.is_formation_sanitaire %}{% url 'statistiques:index' %}{% else %}{% url 'catalogue:liste' %}{% endif %}">💊 <span class="marque-longue">Bienvenue au FRPS-NO en Ligne</span><span class="marque-courte">FRPS-NO</span></a>
         {# Téléphone : l'initiale du compte ouvre le menu (panneau qui monte du bas). #}
         <button class="navbar-toggler entete-avatar" type="button" data-bs-toggle="collapse" data-bs-target="#navPrincipale" aria-controls="navPrincipale" aria-expanded="false" aria-label="Ouvrir le menu du compte">
@@ -59,31 +60,23 @@
         </button>
         <div class="collapse navbar-collapse" id="navPrincipale">
             <div class="d-flex flex-column flex-xl-row align-items-xl-center gap-2 ms-xl-auto">
-                {% if user.is_admin_frps %}
-                <div class="dropdown">
-                    <a class="nav-link dropdown-toggle{% if ns == "catalogue" or ns == "commandes" %} actif{% endif %}" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                        📦 Catalogue
-                    </a>
-                    <ul class="dropdown-menu">
-                        <li><a class="dropdown-item" href="{% url 'catalogue:liste' %}">👀 Voir le catalogue</a></li>
-                        <li><a class="dropdown-item" href="{% url 'catalogue:importer' %}">📥 Importer les produits</a></li>
-                    </ul>
-                </div>
-                {% elif user.is_formation_sanitaire %}
-                <a class="nav-link doublon-onglets" href="{% url 'catalogue:liste' %}"{% if ns == "catalogue" %} aria-current="page"{% endif %}>📦 Catalogue</a>
-                {% endif %}
                 {% if user.is_formation_sanitaire %}
+                <a class="nav-link doublon-onglets" href="{% url 'catalogue:liste' %}"{% if ns == "catalogue" %} aria-current="page"{% endif %}>📦 Catalogue</a>
                 <a class="nav-link doublon-onglets" href="{% url 'commandes:panier' %}"{% if ns == "commandes" and nom == "panier" %} aria-current="page"{% endif %}>
                     🛒 Panier
                     <span class="badge bg-danger" data-badge-panier id="badge-panier"{% if not panier_nb_lignes %} hidden{% endif %}>{{ panier_nb_lignes|default:0 }}</span>
                 </a>
                 <a class="nav-link doublon-onglets" href="{% url 'commandes:historique' %}"{% if ns == "commandes" and nom != "panier" or ns == "paiements" %} aria-current="page"{% endif %}>🧾 Mes commandes</a>
-                {% endif %}
-                {% if not user.is_formation_sanitaire %}
-                <a class="nav-link doublon-onglets" href="{% url 'statistiques:index' %}"{% if ns == "statistiques" and nom == "index" %} aria-current="page"{% endif %}>📊 Tableau de bord</a>
-                <a class="nav-link doublon-onglets" href="{% url 'notifications:liste' %}"{% if ns == "notifications" %} aria-current="page"{% endif %}>
-                    🔔 Notifications
-                    {% if notifications_non_lues_count %}<span class="badge bg-danger">{{ notifications_non_lues_count }}</span>{% endif %}
+                <a class="nav-link" href="{% url 'reclamations:liste' %}"{% if ns == "reclamations" %} aria-current="page"{% endif %}>
+                    💬 Réclamations
+                    {% if reclamations_non_lues_count %}<span class="badge bg-danger">{{ reclamations_non_lues_count }}</span>{% endif %}
+                </a>
+                {% else %}
+                <a class="nav-link doublon-onglets" href="{% url 'statistiques:index' %}"{% if ns == "statistiques" and nom == "index" %} aria-current="page"{% endif %}>📊 <span class="libelle-long">Tableau de bord</span><span class="libelle-court">Tableau</span></a>
+                <a class="nav-link" href="{% url 'commandes:suivi' %}"{% if ns == "commandes" and nom == "suivi" %} aria-current="page"{% endif %}>🚚 Suivi</a>
+                <a class="nav-link" href="{% url 'reclamations:liste' %}"{% if ns == "reclamations" %} aria-current="page"{% endif %}>
+                    💬 Réclamations
+                    {% if reclamations_non_lues_count %}<span class="badge bg-danger">{{ reclamations_non_lues_count }}</span>{% endif %}
                 </a>
                 <div class="dropdown">
                     <a class="nav-link dropdown-toggle{% if ns == "statistiques" and nom != "index" %} actif{% endif %}" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
@@ -97,6 +90,23 @@
                     </ul>
                 </div>
                 <a class="nav-link doublon-onglets" href="{% url 'paiements:gerer_paiements' %}"{% if ns == "paiements" %} aria-current="page"{% endif %}>💳 Paiements</a>
+                {% if user.is_admin_frps %}
+                <div class="dropdown">
+                    <a class="nav-link dropdown-toggle{% if ns == "catalogue" or nom == "parametres_emails" %} actif{% endif %}" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        ⚙️ Administration
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-xl-end">
+                        <li><a class="dropdown-item" href="{% url 'catalogue:liste' %}">📦 Voir le catalogue</a></li>
+                        <li><a class="dropdown-item" href="{% url 'catalogue:importer' %}">📥 Importer les produits</a></li>
+                        <li><a class="dropdown-item" href="{% url 'notifications:parametres_emails' %}">✉️ Paramètres des e-mails</a></li>
+                        <li><a class="dropdown-item" href="{% url 'admin:index' %}">🛠️ Administration Django</a></li>
+                    </ul>
+                </div>
+                {% endif %}
+                {# Cloche seule sur ordinateur (le libellé prenait la place d'un menu) ; sur téléphone, déjà dans les onglets. #}
+                <a class="nav-link doublon-onglets nav-icone" href="{% url 'notifications:liste' %}"{% if ns == "notifications" and nom != "parametres_emails" %} aria-current="page"{% endif %} title="Notifications" aria-label="Notifications{% if notifications_non_lues_count %} ({{ notifications_non_lues_count }} non lues){% endif %}">
+                    🔔{% if notifications_non_lues_count %}<span class="badge bg-danger">{{ notifications_non_lues_count }}</span>{% endif %}
+                </a>
                 {% endif %}
                 <span class="user-pill">
                     {% if user.is_formation_sanitaire %}
@@ -112,7 +122,7 @@
                 </span>
                 <form method="post" action="{% url 'logout' %}" class="mb-0">
                     {% csrf_token %}
-                    <button class="btn btn-sm btn-outline-light" type="submit">Déconnexion</button>
+                    <button class="btn btn-sm btn-outline-light bouton-deconnexion" type="submit" title="Déconnexion"><span class="icone-deconnexion" aria-hidden="true">⏻</span><span class="libelle-deconnexion">Déconnexion</span></button>
                 </form>
             </div>
         </div>
@@ -137,20 +147,22 @@ menu complet (même panneau que l'initiale en haut à droite).
     </a>
     <button type="button" class="onglet" data-bs-toggle="collapse" data-bs-target="#navPrincipale" aria-controls="navPrincipale" aria-expanded="false">
         <span class="user-avatar" aria-hidden="true">{{ user.formation_sanitaire.nom|default:user.username|first|upper }}</span>Compte
+        {% if reclamations_non_lues_count %}<span class="badge bg-danger onglet-badge" title="Réponse du FRPS à une réclamation">{{ reclamations_non_lues_count }}</span>{% endif %}
     </button>
     {% else %}
     <a class="onglet" href="{% url 'statistiques:index' %}"{% if ns == "statistiques" and nom == "index" %} aria-current="page"{% endif %}>
         <span class="onglet-icone" aria-hidden="true">📊</span>Tableau
     </a>
-    <a class="onglet" href="{% url 'notifications:liste' %}"{% if ns == "notifications" %} aria-current="page"{% endif %}>
+    <a class="onglet" href="{% url 'notifications:liste' %}"{% if ns == "notifications" and nom != "parametres_emails" %} aria-current="page"{% endif %}>
         <span class="onglet-icone" aria-hidden="true">🔔</span>Notifications
         {% if notifications_non_lues_count %}<span class="badge bg-danger onglet-badge">{{ notifications_non_lues_count }}</span>{% endif %}
     </a>
     <a class="onglet" href="{% url 'paiements:gerer_paiements' %}"{% if ns == "paiements" %} aria-current="page"{% endif %}>
         <span class="onglet-icone" aria-hidden="true">💳</span>Paiements
     </a>
-    <button type="button" class="onglet{% if ns == "catalogue" or ns == "commandes" or ns == "statistiques" and nom != "index" %} section-active{% endif %}" data-bs-toggle="collapse" data-bs-target="#navPrincipale" aria-controls="navPrincipale" aria-expanded="false">
+    <button type="button" class="onglet{% if ns == "catalogue" or ns == "commandes" or ns == "reclamations" or nom == "parametres_emails" or ns == "statistiques" and nom != "index" %} section-active{% endif %}" data-bs-toggle="collapse" data-bs-target="#navPrincipale" aria-controls="navPrincipale" aria-expanded="false">
         <span class="onglet-icone" aria-hidden="true">☰</span>Menu
+        {% if reclamations_non_lues_count %}<span class="badge bg-danger onglet-badge" title="Réclamations à lire">{{ reclamations_non_lues_count }}</span>{% endif %}
     </button>
     {% endif %}
 </nav>

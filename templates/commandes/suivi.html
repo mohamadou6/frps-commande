@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Suivi des commandes - Commande FRPS{% endblock %}
+{% block content %}
+<h1 class="h4 app-titre mb-1">Suivi des commandes</h1>
+<p class="app-sous-titre text-muted small">
+    {% if peut_avancer %}
+    Faites avancer chaque commande validée : nouvelle → en préparation → prête → livrée.
+    Quand une commande passe à « prête », la formation sanitaire est prévenue par SMS.
+    {% else %}
+    Où en est la préparation des commandes validées (consultation seule).
+    {% endif %}
+    Chaque chiffre compte les commandes <strong>actuellement</strong> à cette étape : une commande quitte
+    une case quand elle passe à la suivante.
+</p>
+
+<div class="filtres-puces mb-3" role="group" aria-label="Filtrer par étape">
+    {% for code, libelle, nombre in filtres %}
+    <a href="?etape={{ code }}{% if query %}&q={{ query|urlencode }}{% endif %}"
+       class="btn btn-sm {% if filtre == code %}btn-primary{% else %}btn-outline-secondary{% endif %}"
+       {% if filtre == code %}aria-current="page"{% endif %}>
+        {{ libelle }}{% if nombre is not None %} <span class="badge bg-body-secondary text-body-secondary">{{ nombre }}</span>{% endif %}
+    </a>
+    {% endfor %}
+</div>
+
+<form method="get" class="row g-2 mb-3">
+    <input type="hidden" name="etape" value="{{ filtre }}">
+    <div class="col-auto flex-grow-1">
+        <input type="search" name="q" value="{{ query }}" placeholder="Rechercher une formation sanitaire..."
+               class="form-control champ-recherche">
+    </div>
+    <div class="col-auto">
+        <button type="submit" class="btn btn-outline-primary">Rechercher</button>
+    </div>
+</form>
+
+{# Téléphone : une carte par commande, le bouton d'étape à portée de pouce. #}
+<div class="d-md-none">
+    {% for commande in commandes %}
+    <div class="app-carte p-3 mb-2">
+        <div class="d-flex justify-content-between align-items-start gap-2">
+            <strong class="text-break">#{{ commande.id }} · {{ commande.formation_sanitaire.nom }}</strong>
+            {% include "commandes/_badge_etape.html" %}
+        </div>
+        <div class="small text-muted mb-2">
+            Validée le {{ commande.date_confirmation|date:"d/m/Y H:i" }} · {{ commande.montant_total|floatformat:"0" }} FCFA
+        </div>
+        <div class="d-flex gap-2">{% include "commandes/_actions_suivi.html" %}</div>
+    </div>
+    {% empty %}
+    <p class="text-center text-muted">Aucune commande à cette étape.</p>
+    {% endfor %}
+</div>
+
+<div class="table-responsive d-none d-md-block">
+<table class="table table-striped align-middle">
+    <thead>
+        <tr><th>#</th><th>Formation sanitaire</th><th>Validée le</th><th>Montant</th><th>Étape</th><th></th></tr>
+    </thead>
+    <tbody>
+        {% for commande in commandes %}
+        <tr>
+            <td>{{ commande.id }}</td>
+            <td>{{ commande.formation_sanitaire.nom }}</td>
+            <td class="text-nowrap">{{ commande.date_confirmation|date:"d/m/Y H:i" }}</td>
+            <td class="text-nowrap">{{ commande.montant_total|floatformat:"0" }} FCFA</td>
+            <td>{% include "commandes/_badge_etape.html" %}</td>
+            <td class="text-nowrap">{% include "commandes/_actions_suivi.html" %}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" class="text-center text-muted">Aucune commande à cette étape.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+</div>
+{% endblock %}

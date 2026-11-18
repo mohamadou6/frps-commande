@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% block title %}Paramètres des e-mails - Commande FRPS{% endblock %}
+{% block content %}
+<h1 class="h4 app-titre mb-1">⚙️ Paramètres des e-mails</h1>
+<p class="app-sous-titre text-muted small mb-3">
+    Choisissez qui reçoit chaque e-mail de l'application. Une adresse n'a pas besoin d'avoir un compte.
+</p>
+{% if not envoi_reel %}
+<div class="alert alert-warning small">
+    🧪 <strong>Mode test :</strong> sur ce serveur, les e-mails ne partent pas. Ils sont seulement affichés
+    dans la console du serveur (marqués « Simulé » ci-dessous). Les réglages faits ici restent valables :
+    les e-mails partiront réellement sur le serveur en ligne.
+</div>
+{% endif %}
+
+<div class="row g-2 mb-3">
+    {% for envoi in envois %}
+    <div class="col-12 col-md-4">
+        <div class="border rounded-3 p-2 h-100{% if envoi.champ == 'recoit_reclamations' and not envoi.nb_actifs %} border-danger{% endif %}">
+            <div class="fw-semibold">{{ envoi.libelle }}</div>
+            <div class="small text-muted d-none d-md-block">{{ envoi.aide }}</div>
+            <div class="small mt-1">
+                {% if envoi.nb_actifs %}
+                <span class="badge bg-success">{{ envoi.nb_actifs }} adresse{{ envoi.nb_actifs|pluralize }}</span>
+                {% elif envoi.champ == 'recoit_reclamations' %}
+                <span class="badge bg-danger">Aucune adresse : aucun e-mail ne part</span>
+                {% else %}
+                <span class="badge bg-body-secondary text-body-secondary">Comptes du personnel seulement</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<div class="row g-4">
+<div class="col-12 col-lg-7">
+<h2 class="h6">Ajouter une adresse</h2>
+<form method="post" class="app-carte p-3 mb-4">
+    {% csrf_token %}
+    <div class="row g-2 mb-2">
+        <div class="col-12 col-sm-7">
+            <label for="email" class="form-label small mb-1">Adresse e-mail</label>
+            <input type="email" name="email" id="email" class="form-control" required value="{{ saisie.email }}"
+                   placeholder="ex. qualite@frpsno.com" autocomplete="off">
+        </div>
+        <div class="col-12 col-sm-5">
+            <label for="nom" class="form-label small mb-1">Nom <span class="text-muted">(facultatif)</span></label>
+            <input type="text" name="nom" id="nom" class="form-control" maxlength="100" value="{{ saisie.nom }}"
+                   placeholder="ex. Service qualité">
+        </div>
+    </div>
+    <fieldset class="mb-2">
+        <legend class="form-label small mb-1">Reçoit</legend>
+        {% for envoi in envois %}
+        <div class="form-check form-check-inline">
+            <input class="form-check-input" type="checkbox" name="envois" value="{{ envoi.champ }}" id="nouveau-{{ envoi.champ }}"
+                   {% if envoi.champ in saisie.envois %}checked{% endif %}>
+            <label class="form-check-label" for="nouveau-{{ envoi.champ }}">{{ envoi.libelle }}</label>
+        </div>
+        {% endfor %}
+    </fieldset>
+    <button type="submit" class="btn btn-primary">➕ Ajouter</button>
+</form>
+
+<h2 class="h6">Adresses paramétrées <span class="badge bg-body-secondary text-body-secondary">{{ destinataires|length }}</span></h2>
+{% for d in destinataires %}
+<div class="app-carte p-3 mb-2{% if not d.actif %} opacity-75{% endif %}">
+    <form method="post" action="{% url 'notifications:modifier_destinataire_email' d.pk %}">
+        {% csrf_token %}
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+            <div>
+                <strong class="text-break">{{ d.email }}</strong>
+                {% if d.nom %}<span class="text-muted small"> · {{ d.nom }}</span>{% endif %}
+                {% if not d.actif %}<span class="badge bg-secondary ms-1">Désactivée</span>{% endif %}
+            </div>
+            <div class="form-check form-switch mb-0">
+                <input class="form-check-input" type="checkbox" role="switch" name="actif" value="1" id="actif-{{ d.pk }}"{% if d.actif %} checked{% endif %}>
+                <label class="form-check-label small" for="actif-{{ d.pk }}">Active</label>
+            </div>
+        </div>
+        <div class="mb-2">
+            <div class="form-check form-check-inline">
+                <input class="form-check-input" type="checkbox" name="envois" value="recoit_reclamations" id="r-{{ d.pk }}"{% if d.recoit_reclamations %} checked{% endif %}>
+                <label class="form-check-label" for="r-{{ d.pk }}">Réclamations</label>
+            </div>
+            <div class="form-check form-check-inline">
+                <input class="form-check-input" type="checkbox" name="envois" value="recoit_commandes" id="c-{{ d.pk }}"{% if d.recoit_commandes %} checked{% endif %}>
+                <label class="form-check-label" for="c-{{ d.pk }}">Nouvelles commandes</label>
+            </div>
+            <div class="form-check form-check-inline">
+                <input class="form-check-input" type="checkbox" name="envois" value="recoit_rapports" id="a-{{ d.pk }}"{% if d.recoit_rapports %} checked{% endif %}>
+                <label class="form-check-label" for="a-{{ d.pk }}">Rapport d'activité</label>
+            </div>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+            <button type="submit" class="btn btn-sm btn-primary">Enregistrer</button>
+            <button type="submit" class="btn btn-sm btn-outline-secondary"
+                    formaction="{% url 'notifications:tester_destinataire_email' d.pk %}">✉️ Envoyer un test</button>
+            <button type="submit" class="btn btn-sm btn-outline-danger"
+                    formaction="{% url 'notifications:supprimer_destinataire_email' d.pk %}"
+                    onclick="return confirm('Retirer {{ d.email|escapejs }} de la liste ?');">Supprimer</button>
+        </div>
+    </form>
+</div>
+{% empty %}
+<p class="text-muted">Aucune adresse pour le moment. Ajoutez au moins une adresse cochée « Réclamations » : sans elle, aucune réclamation n'est envoyée par e-mail.</p>
+{% endfor %}
+</div>
+
+<div class="col-12 col-lg-5">
+{% if comptes_avec_email %}
+<h2 class="h6">Reçoivent déjà par leur compte</h2>
+<p class="text-muted small mb-1">
+    Ces comptes du personnel ont un e-mail : ils reçoivent déjà les nouvelles commandes (et le rapport pour
+    l'administrateur), sans figurer dans les adresses paramétrées. Pas les réclamations, sauf si vous les ajoutez.
+</p>
+<ul class="small">
+    {% for compte in comptes_avec_email %}<li>{{ compte.username }} — {{ compte.email }} <span class="text-muted">({{ compte.get_role_display }})</span></li>{% endfor %}
+</ul>
+{% endif %}
+
+{% if derniers_envois %}
+<h2 class="h6 mt-4">Derniers e-mails envoyés</h2>
+<ul class="list-unstyled app-carte p-2 small mb-0">
+    {% for e in derniers_envois %}
+    <li class="d-flex gap-2 align-items-start px-2 py-2{% if not forloop.last %} border-bottom{% endif %}">
+        {% if e.statut_envoi == "envoye" and not envoi_reel %}<span class="badge bg-body-secondary text-body-secondary" title="Affiché dans la console du serveur, pas envoyé">Simulé</span>{% elif e.statut_envoi == "envoye" %}<span class="badge bg-success">Envoyé</span>{% else %}<span class="badge bg-danger" title="{{ e.detail_erreur }}">Échec</span>{% endif %}
+        <span class="flex-grow-1 min-w-0">
+            <span class="d-block text-break fw-semibold">{{ e.destinataire }}</span>
+            <span class="d-block text-muted text-truncate" title="{{ e.sujet }}">{{ e.sujet }}</span>
+        </span>
+        <span class="text-muted text-nowrap">{{ e.date_envoi|date:"d/m H:i" }}</span>
+    </li>
+    {% endfor %}
+</ul>
+{% endif %}
+</div>
+</div>
+{% endblock %}

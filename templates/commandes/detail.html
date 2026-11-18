@@ -17,6 +17,15 @@
 </div>
 {% endif %}
 {% if commande.est_effective %}
+<ol class="suivi-etapes mb-3" aria-label="Suivi de la commande">
+    {% for libelle, date, atteinte in commande.etapes_suivi %}
+    <li class="{% if atteinte %}atteinte{% endif %}">
+        <span class="suivi-point" aria-hidden="true"></span>
+        <span class="suivi-libelle">{{ libelle }}</span>
+        {% if atteinte and date %}<span class="suivi-date">{{ date|date:"d/m H:i" }}</span>{% endif %}
+    </li>
+    {% endfor %}
+</ol>
 <p>
     État de paiement :
     {% if commande.etat_paiement == "payee" %}
@@ -70,6 +79,15 @@
             onclick="partagerPdfWhatsApp('{% url 'commandes:telecharger_pdf' commande.id %}', 'commande_{{ commande.id }}.pdf', 'Commande #{{ commande.id }} - {{ commande.formation_sanitaire.nom }} ({{ commande.montant_total|floatformat:"0" }} FCFA)', this)">
         Partager par WhatsApp
     </button>
+    {% endif %}
+    {% if commande.statut != "brouillon" %}
+    <form method="post" action="{% url 'commandes:recommander' commande.id %}" class="d-inline">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-primary">🔁 Recommander</button>
+    </form>
+    {% endif %}
+    {% if commande.est_effective %}
+    <a href="{% url 'reclamations:nouvelle' %}?commande={{ commande.id }}" class="btn btn-outline-danger">💬 Faire une réclamation</a>
     {% endif %}
 </div>
 {% endblock %}

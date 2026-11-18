@@ -1,0 +1,1 @@
+{% if commande.etat_paiement == "payee" %}<span class="badge bg-success">Payée</span>{% elif commande.etat_paiement == "partielle" %}<span class="badge bg-warning text-dark">Partielle</span>{% else %}<span class="badge bg-secondary">Non payée</span>{% endif %}

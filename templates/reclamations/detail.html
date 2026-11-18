@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Réclamation #{{ reclamation.id }} - Commande FRPS{% endblock %}
+{% block extra_head %}<script src="{% static 'js/photos.js' %}" defer></script>{% endblock %}
+{% block content %}
+<a href="{% url 'reclamations:liste' %}" class="small text-decoration-none">← {% if user.is_formation_sanitaire %}Mes réclamations{% else %}Toutes les réclamations{% endif %}</a>
+<h1 class="h4 app-titre mt-2 mb-2">Réclamation #{{ reclamation.id }}</h1>
+
+<div class="app-carte p-3 mb-3">
+    <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+        {% include "reclamations/_badge_statut.html" %}
+        <strong>{{ reclamation.get_motif_display }}</strong>
+    </div>
+    <div class="small text-muted">
+        {% if not user.is_formation_sanitaire %}🏥 {{ reclamation.formation_sanitaire.nom }} · {% endif %}
+        Envoyée le {{ reclamation.date_creation|date:"d/m/Y à H:i" }}
+        {% if reclamation.commande %}
+        · Commande
+        {% if user.is_formation_sanitaire %}<a href="{% url 'commandes:detail' reclamation.commande.id %}">#{{ reclamation.commande.id }}</a>
+        {% else %}<a href="{% url 'commandes:telecharger_pdf_staff' reclamation.commande.id %}" title="Bon de commande (PDF)">#{{ reclamation.commande.id }} (PDF)</a>{% endif %}
+        {% endif %}
+        {% if reclamation.date_resolution %}· Résolue le {{ reclamation.date_resolution|date:"d/m/Y" }}{% endif %}
+    </div>
+</div>
+
+<ol class="fil-reclamation list-unstyled">
+    <li class="bulle bulle-fosa">
+        <div class="bulle-entete">{{ reclamation.formation_sanitaire.nom }} · {{ reclamation.date_creation|date:"d/m H:i" }}</div>
+        {{ reclamation.description|linebreaksbr }}
+        {% include "reclamations/_photos.html" with photos=photos_initiales %}
+    </li>
+    {% for message in fil %}
+    <li class="bulle {% if message.de_la_fosa %}bulle-fosa{% else %}bulle-frps{% endif %}">
+        <div class="bulle-entete">
+            {% if message.de_la_fosa %}{{ reclamation.formation_sanitaire.nom }}{% else %}FRPS{% if not user.is_formation_sanitaire and message.auteur %} ({{ message.auteur }}){% endif %}{% endif %}
+            · {{ message.date|date:"d/m H:i" }}
+        </div>
+        {{ message.texte|linebreaksbr }}
+        {% include "reclamations/_photos.html" with photos=message.photos.all %}
+    </li>
+    {% endfor %}
+</ol>
+
+<form method="post" enctype="multipart/form-data" action="{% url 'reclamations:repondre' reclamation.id %}" class="app-carte p-3" style="max-width: 720px;">
+    {% csrf_token %}
+    <label for="texte" class="form-label">
+        {% if user.is_formation_sanitaire %}{% if reclamation.est_close %}Le problème n'est pas réglé ? Écrivez au FRPS (la réclamation sera rouverte){% else %}Ajouter un message{% endif %}{% else %}Répondre à la formation sanitaire{% endif %}
+    </label>
+    <textarea name="texte" id="texte" rows="3" maxlength="4000" class="form-control mb-2"></textarea>
+    {% include "reclamations/_champ_photos.html" %}
+    <div class="d-flex flex-wrap gap-2 align-items-center">
+        {% if not user.is_formation_sanitaire %}
+        <label for="statut" class="visually-hidden">Statut</label>
+        <select name="statut" id="statut" class="form-select w-auto">
+            {% for code, libelle in statuts %}
+            <option value="{{ code }}"{% if reclamation.statut == code %} selected{% endif %}>{{ libelle }}</option>
+            {% endfor %}
+        </select>
+        {% endif %}
+        <button type="submit" class="btn btn-primary">Envoyer</button>
+    </div>
+</form>
+{% endblock %}
