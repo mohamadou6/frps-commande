@@ -53,8 +53,9 @@ Les graphiques Chart.js lisent le thème au chargement (`NEUTRES` dans `graphiqu
   bas en panneau. Un lien déjà présent dans les onglets porte `doublon-onglets` pour ne
   pas être répété dans le panneau. Titre long à partir de 1 200 px pour une FOSA,
   1 600 px pour le personnel (`nav-personnel`), sinon la barre déborde.
-- **Barre du personnel, ordinateur** : `container-fluid conteneur-nav` (jusqu'à 1 680 px)
-  et non `container`, sinon elle déborde. Entre 1 200 et 1 600 px : libellés abrégés
+- **Barre de navigation, ordinateur (tous les comptes)** : `container-fluid conteneur-nav`
+  (jusqu'à 1 680 px) et non `container`, sinon elle déborde. Titre long seulement dès
+  1 600 px. Entre 1 200 et 1 600 px : libellés abrégés
   (`.libelle-long` / `.libelle-court`), Notifications en cloche seule (`.nav-icone`),
   Déconnexion en icône. Catalogue, import et Paramètres sont regroupés dans le menu
   **Administration** (admin seul). **Toute nouvelle entrée de menu doit être mesurée à

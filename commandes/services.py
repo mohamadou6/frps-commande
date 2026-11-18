@@ -5,6 +5,7 @@ from django.db.models import F
 from django.utils import timezone
 
 from catalogue.models import Produit
+from catalogue.services import prix_de_vente, prix_promotionnels
 
 from .models import Commande, EtapeTraitement, LigneCommande, StatutCommande
 
@@ -37,14 +38,16 @@ def ajouter_produit(commande, produit, quantite):
             f"Stock insuffisant pour {produit.nom} (disponible : {produit.stock_disponible})"
         )
 
+    # Prix du moment : le prix promotionnel si une promotion est en cours.
+    prix = prix_de_vente(produit)
     ligne, created = LigneCommande.objects.get_or_create(
         commande=commande,
         produit=produit,
-        defaults={"quantite": quantite, "prix_unitaire_snapshot": produit.prix_unitaire},
+        defaults={"quantite": quantite, "prix_unitaire_snapshot": prix},
     )
     if not created:
         ligne.quantite = quantite
-        ligne.prix_unitaire_snapshot = produit.prix_unitaire
+        ligne.prix_unitaire_snapshot = prix
         ligne.save()
 
     commande.recalculer_montant()
@@ -134,6 +137,7 @@ def recevoir_demande(formation_sanitaire, uuid_client, quantites, panier_id=None
     produits = Produit.objects.in_bulk(list(quantites))
     if not produits:
         raise DemandeInvalideError("Aucun des produits demandés n'existe plus au catalogue.")
+    promos = prix_promotionnels(produits)
 
     try:
         with transaction.atomic():
@@ -148,7 +152,7 @@ def recevoir_demande(formation_sanitaire, uuid_client, quantites, panier_id=None
                     produit=produit,
                     quantite=0,
                     quantite_demandee=quantites[produit_id],
-                    prix_unitaire_snapshot=produit.prix_unitaire,
+                    prix_unitaire_snapshot=prix_de_vente(produit, promos),
                 )
                 for produit_id, produit in produits.items()
             )
@@ -215,11 +219,12 @@ def valider_demande(commande):
             .filter(pk__in=[ligne.produit_id for ligne in lignes])
             .order_by("pk")
         }
+        promos = prix_promotionnels(produits)
         for ligne in lignes:
             produit = produits[ligne.produit_id]
             disponible = produit.stock_disponible if produit.actif else 0
             ligne.quantite = min(ligne.quantite_demandee, disponible)
-            ligne.prix_unitaire_snapshot = produit.prix_unitaire
+            ligne.prix_unitaire_snapshot = prix_de_vente(produit, promos)
         LigneCommande.objects.bulk_update(lignes, ["quantite", "prix_unitaire_snapshot"])
 
         servies = [ligne for ligne in lignes if ligne.quantite]

@@ -1,0 +1,69 @@
+{% load l10n %}
+{% comment %}
+Fiche produit commune au catalogue, aux Promotions et aux Baisses de prix.
+Attend : produit annoté par catalogue/views.py _annoter_offres (prix_du_jour,
+en_promotion, pourcentage_promotion, pourcentage_baisse, quantite_panier).
+{% endcomment %}
+<div class="col">
+    <div class="produit-card{% if produit.quantite_panier %} au-panier{% endif %}{% if produit.en_promotion %} en-promotion{% endif %}">
+        <div class="d-flex justify-content-between align-items-start gap-2">
+            {% if produit.rayon %}
+            <span class="produit-rayon-tag">{{ produit.rayon.icone }} {{ produit.rayon.nom }}</span>
+            {% else %}
+            <span class="produit-rayon-tag">&nbsp;</span>
+            {% endif %}
+            {% if produit.niveau_stock == "rupture" %}
+                <span class="badge bg-danger text-nowrap">Rupture</span>
+            {% elif produit.niveau_stock == "critique" %}
+                <span class="badge bg-danger text-nowrap">⚠ Plus que {{ produit.stock_disponible }}</span>
+            {% elif produit.niveau_stock == "faible" %}
+                <span class="badge bg-warning text-dark text-nowrap">⚠ {{ produit.stock_disponible }} dispo</span>
+            {% else %}
+                <span class="badge bg-success text-nowrap">{{ produit.stock_disponible }} dispo</span>
+            {% endif %}
+        </div>
+        {% if produit.en_promotion %}
+        <span class="etiquette-offre etiquette-promo">🏷️ Offre spéciale -{{ produit.pourcentage_promotion }} %</span>
+        {% elif produit.pourcentage_baisse %}
+        <span class="etiquette-offre etiquette-baisse">📉 Prix en baisse -{{ produit.pourcentage_baisse }} %</span>
+        {% endif %}
+        <div class="produit-nom">{{ produit.nom }}</div>
+        <div class="produit-meta">Unité : {{ produit.unite|default:"-" }}</div>
+        <div class="produit-prix">
+            {% if produit.en_promotion %}
+            <s class="prix-barre">{{ produit.prix_unitaire }}</s> {{ produit.prix_du_jour }} FCFA
+            {% elif produit.prix_avant %}
+            <s class="prix-barre">{{ produit.prix_avant }}</s> {{ produit.prix_unitaire }} FCFA
+            {% else %}
+            {{ produit.prix_unitaire }} FCFA
+            {% endif %}
+        </div>
+        {% if produit.promotion %}
+        <div class="produit-meta">
+            Jusqu'au {{ produit.promotion.date_fin|date:"d/m/Y" }}{% if produit.promotion.message %} · {{ produit.promotion.message }}{% endif %}
+        </div>
+        {% endif %}
+        {% if produit.quantite_panier %}
+        <div class="produit-au-panier">🛒 Déjà au panier : {{ produit.quantite_panier }}</div>
+        {% endif %}
+        {# data-produit-* : lus par js/app.js pour ajouter le produit sans réseau. #}
+        <form method="post" action="{% url 'commandes:ajouter' produit.id %}" class="d-flex gap-2 form-ajout"
+              data-produit-id="{{ produit.id|unlocalize }}" data-produit-nom="{{ produit.nom }}"
+              data-produit-prix="{{ produit.prix_du_jour|unlocalize }}" data-produit-stock="{{ produit.stock_disponible|unlocalize }}">
+            {% csrf_token %}
+            <input type="number" name="quantite" min="1" max="{{ produit.stock_disponible|unlocalize }}" value="1"
+                   class="form-control form-control-sm quantite-input"
+                   {% if produit.stock_disponible == 0 %}disabled{% endif %}>
+            <button type="submit" class="btn btn-sm btn-ajouter flex-grow-1" {% if produit.stock_disponible == 0 %}disabled{% endif %}>
+                Ajouter
+            </button>
+        </form>
+        {% if admin_peut_masquer and user.is_admin_frps %}
+        <form method="post" action="{% url admin_peut_masquer produit.id %}" class="mt-2"
+              onsubmit="return confirm('Retirer {{ produit.nom|escapejs }} des promotions (prix en baisse) ?');">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-sm btn-link text-danger p-0">Masquer</button>
+        </form>
+        {% endif %}
+    </div>
+</div>

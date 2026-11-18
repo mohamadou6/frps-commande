@@ -2,14 +2,20 @@ import unicodedata
 from decimal import Decimal, InvalidOperation
 
 from django.contrib import messages
-from django.db import models
-from django.shortcuts import render
+from django.db import models, transaction
+from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
+from django.utils import timezone
+from django.utils.dateparse import parse_date
+from django.views.decorators.http import require_POST
 from openpyxl import load_workbook
 
 from accounts.decorators import admin_frps_required, formation_sanitaire_required
 from commandes.models import Commande, StatutCommande
 
-from .models import Magasin, Produit, Rayon
+from .models import Magasin, Produit, Promotion, Rayon
+from . import services
+from .services import noter_baisses_prix
 
 SLUG_AUTRES = "autres"
 
@@ -61,8 +67,7 @@ def liste(request):
             quantites_panier = dict(panier.lignes.values_list("produit_id", "quantite"))
 
     produits = list(produits)
-    for produit in produits:
-        produit.quantite_panier = quantites_panier.get(produit.pk, 0)
+    _annoter_offres(produits, quantites_panier)
 
     return render(
         request,
@@ -73,8 +78,137 @@ def liste(request):
             "rayons": rayons,
             "rayon_actif": rayon_actif,
             "nb_produits_total": produits_visibles.count(),
+            "nb_promotions": services.nombre_promotions(),
         },
     )
+
+
+def _quantites_panier(request):
+    """Quantités déjà au panier de la FOSA ({produit_id: quantité}). L'admin FRPS n'a
+    pas de formation sanitaire, donc pas de panier."""
+    if not request.user.is_formation_sanitaire:
+        return {}
+    panier = Commande.objects.filter(
+        formation_sanitaire=request.user.formation_sanitaire, statut=StatutCommande.BROUILLON
+    ).first()
+    return dict(panier.lignes.values_list("produit_id", "quantite")) if panier else {}
+
+
+def _annoter_offres(produits, quantites_panier):
+    """Pose sur chaque fiche : quantité au panier, prix du jour (promotion comprise)
+    et pourcentage de la promotion ou de la baisse récente, pour les étiquettes."""
+    promos = services.prix_promotionnels([p.pk for p in produits])
+    baisses = {p.pk: p.pourcentage_baisse for p in services.baisses_prix_recentes()}
+    for produit in produits:
+        produit.quantite_panier = quantites_panier.get(produit.pk, 0)
+        produit.prix_du_jour = services.prix_de_vente(produit, promos)
+        produit.en_promotion = produit.pk in promos
+        produit.pourcentage_promotion = (
+            round((1 - produit.prix_du_jour / produit.prix_unitaire) * 100) if produit.en_promotion else None
+        )
+        produit.pourcentage_baisse = baisses.get(produit.pk)
+
+
+@formation_sanitaire_required
+def promotions(request):
+    """Menu Promotions des FOSA, deux types :
+    - offres spéciales : créées par l'admin (prix promotionnel, durée limitée) ;
+    - prix en baisse : le prix de vente a baissé (détecté à l'import ou dans l'admin).
+    `?type=offre` ou `?type=baisse` n'affiche qu'un type."""
+    offres, baisses = services.toutes_les_promotions()
+    produits_offres = [promo.produit for promo in offres]
+    for promo, produit in zip(offres, produits_offres):
+        produit.promotion = promo
+    quantites = _quantites_panier(request)
+    _annoter_offres(produits_offres, quantites)
+    _annoter_offres(baisses, quantites)
+
+    type_affiche = request.GET.get("type", "")
+    if type_affiche not in ("offre", "baisse"):
+        type_affiche = ""
+    return render(
+        request,
+        "catalogue/promotions.html",
+        {
+            "offres": produits_offres if type_affiche != "baisse" else [],
+            "baisses": baisses if type_affiche != "offre" else [],
+            "nb_offres": len(produits_offres),
+            "nb_baisses": len(baisses),
+            "type_affiche": type_affiche,
+            "duree_baisse": services.BAISSE_DUREE_JOURS,
+        },
+    )
+
+
+@admin_frps_required
+@require_POST
+def masquer_baisse(request, produit_id):
+    produit = get_object_or_404(Produit, pk=produit_id)
+    if services.masquer_baisse(produit):
+        messages.success(request, f"{produit.nom} retiré des promotions (prix en baisse).")
+    return redirect(f"{reverse('catalogue:promotions')}?type=baisse")
+
+
+@admin_frps_required
+def gerer_promotions(request):
+    """Mettre un produit en promotion (prix promotionnel + période) et suivre les
+    promotions en cours, à venir et passées."""
+    saisie = {cle: request.POST.get(cle, "") for cle in ("produit", "prix", "debut", "fin", "message")}
+    if request.method == "POST":
+        produit = Produit.objects.filter(pk=saisie["produit"] or 0).first()
+        if produit is None:
+            messages.error(request, "Choisissez un produit dans la liste.")
+        else:
+            try:
+                promotion = services.creer_promotion(
+                    produit,
+                    saisie["prix"],
+                    parse_date(saisie["debut"] or ""),
+                    parse_date(saisie["fin"] or ""),
+                    saisie["message"],
+                    auteur=request.user,
+                )
+            except ValueError as exc:
+                messages.error(request, str(exc))
+            else:
+                messages.success(
+                    request,
+                    f"{produit.nom} en promotion à {promotion.prix_promotionnel} FCFA "
+                    f"du {promotion.date_debut:%d/%m/%Y} au {promotion.date_fin:%d/%m/%Y}.",
+                )
+                return redirect("catalogue:gerer_promotions")
+
+    aujourdhui = timezone.localdate()
+    toutes = Promotion.objects.select_related("produit").order_by("-date_debut")
+    return render(
+        request,
+        "catalogue/gerer_promotions.html",
+        {
+            "en_cours": toutes.filter(active=True, date_debut__lte=aujourdhui, date_fin__gte=aujourdhui),
+            "a_venir": toutes.filter(active=True, date_debut__gt=aujourdhui),
+            "terminees": (toutes.filter(active=False) | toutes.filter(date_fin__lt=aujourdhui))[:20],
+            # Pour la recherche de produit (statistiques/js/combobox.js) : le prix normal
+            # est dans le libellé, l'admin voit tout de suite de quoi il part.
+            "produits_json": [
+                {"id": p.pk, "nom": f"{p.nom} — {p.prix_unitaire} FCFA ({p.code_sage})"}
+                for p in Produit.objects.filter(
+                    actif=True, magasin__in=services.MAGASINS_CATALOGUE, prix_unitaire__gt=0
+                ).order_by("nom")
+            ],
+            "produit_choisi": Produit.objects.filter(pk=saisie["produit"] or 0).first(),
+            "saisie": saisie,
+            "aujourdhui": aujourdhui,
+        },
+    )
+
+
+@admin_frps_required
+@require_POST
+def arreter_promotion(request, promotion_id):
+    promotion = get_object_or_404(Promotion, pk=promotion_id)
+    services.arreter_promotion(promotion)
+    messages.success(request, f"Promotion sur {promotion.produit.nom} arrêtée : le prix normal s'applique.")
+    return redirect("catalogue:gerer_promotions")
 
 
 def _normaliser_entete(valeur):
@@ -171,6 +305,7 @@ def importer_produits(request):
                 nb_inchanges = 0
                 a_sauvegarder = []
                 a_creer = []
+                baisses = []
 
                 for code_sage, donnees in updates.items():
                     prix = donnees["prix"]
@@ -206,12 +341,23 @@ def importer_produits(request):
                             "nouveau_stock": stock,
                         }
                     )
+                    if variation_prix == "baisse":
+                        baisses.append((produit, produit.prix_unitaire, prix))
                     produit.prix_unitaire = prix
                     produit.stock_disponible = stock
                     a_sauvegarder.append(produit)
 
                 if a_sauvegarder:
-                    Produit.objects.bulk_update(a_sauvegarder, ["prix_unitaire", "stock_disponible"], batch_size=200)
+                    with transaction.atomic():
+                        Produit.objects.bulk_update(
+                            a_sauvegarder, ["prix_unitaire", "stock_disponible"], batch_size=200
+                        )
+                        nb_promotions = noter_baisses_prix(baisses)
+                    if nb_promotions:
+                        messages.info(
+                            request,
+                            f"{nb_promotions} baisse(s) de prix ajoutée(s) aux Promotions des FOSA (type « prix en baisse »).",
+                        )
                 if a_creer:
                     Produit.objects.bulk_create(a_creer, batch_size=200)
 

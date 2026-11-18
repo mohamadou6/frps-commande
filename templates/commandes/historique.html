@@ -3,6 +3,64 @@
 {% block content %}
 <h1 class="h4 app-titre mb-3">Mes commandes</h1>
 
+<details class="app-carte recherche-commandes mb-3"{% if recherche_active %} open{% endif %}>
+    <summary>🔎 Rechercher une commande{% if recherche_active %} <span class="badge bg-primary">filtres actifs</span>{% endif %}</summary>
+    <form method="get" class="row g-2 pt-2">
+        <div class="col-6 col-md-2">
+            <label for="numero" class="form-label small mb-1">N° de commande</label>
+            <input type="text" inputmode="numeric" name="numero" id="numero" class="form-control" value="{{ criteres.numero }}" placeholder="ex. 18">
+        </div>
+        <div class="col-6 col-md-3">
+            <label for="produit" class="form-label small mb-1">Produit commandé</label>
+            <input type="search" name="produit" id="produit" class="form-control" value="{{ criteres.produit }}" placeholder="ex. amoxicilline">
+        </div>
+        <div class="col-6 col-md-2">
+            <label for="debut" class="form-label small mb-1">Du</label>
+            <input type="date" name="debut" id="debut" class="form-control" value="{{ criteres.debut }}">
+        </div>
+        <div class="col-6 col-md-2">
+            <label for="fin" class="form-label small mb-1">Au</label>
+            <input type="date" name="fin" id="fin" class="form-control" value="{{ criteres.fin }}">
+        </div>
+        <div class="col-6 col-md-3">
+            <label class="form-label small mb-1" for="montant_min">Montant (FCFA)</label>
+            <div class="input-group">
+                <input type="text" inputmode="numeric" name="montant_min" id="montant_min" class="form-control" value="{{ criteres.montant_min }}" placeholder="min" aria-label="Montant minimum">
+                <input type="text" inputmode="numeric" name="montant_max" class="form-control" value="{{ criteres.montant_max }}" placeholder="max" aria-label="Montant maximum">
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <label for="etape" class="form-label small mb-1">Suivi</label>
+            <select name="etape" id="etape" class="form-select">
+                <option value="">Toutes les étapes</option>
+                {% for code, libelle in etapes %}<option value="{{ code }}"{% if criteres.etape == code %} selected{% endif %}>{{ libelle }}</option>{% endfor %}
+            </select>
+        </div>
+        <div class="col-6 col-md-3">
+            <label for="paiement" class="form-label small mb-1">Paiement</label>
+            <select name="paiement" id="paiement" class="form-select">
+                <option value="">Tous</option>
+                {% for code, libelle in etats_paiement %}<option value="{{ code }}"{% if criteres.paiement == code %} selected{% endif %}>{{ libelle }}</option>{% endfor %}
+            </select>
+        </div>
+        <div class="col-6 col-md-3">
+            <label for="tri" class="form-label small mb-1">Trier par</label>
+            <select name="tri" id="tri" class="form-select">
+                {% for code, libelle in tris %}<option value="{{ code }}"{% if criteres.tri == code %} selected{% endif %}>{{ libelle }}</option>{% endfor %}
+            </select>
+        </div>
+        <div class="col-12 col-md-3 d-flex align-items-end gap-2">
+            <button type="submit" class="btn btn-primary flex-grow-1">Rechercher</button>
+            {% if recherche_active %}<a href="{% url 'commandes:historique' %}" class="btn btn-outline-secondary">Effacer</a>{% endif %}
+        </div>
+    </form>
+</details>
+
+<p class="small text-muted mb-2">
+    {{ resume.nombre }} commande{{ resume.nombre|pluralize }}{% if recherche_active %} trouvée{{ resume.nombre|pluralize }}{% endif %}
+    {% if resume.montant %}· {{ resume.montant|floatformat:"0" }} FCFA validés{% endif %}
+</p>
+
 {# Téléphone : une carte cliquable par commande (le tableau à 7 colonnes défilait de côté). #}
 <div class="d-md-none">
     {% for commande in commandes %}
@@ -18,7 +76,7 @@
         </div>
     </a>
     {% empty %}
-    <p class="text-center text-muted">Aucune commande passée pour le moment.</p>
+    <p class="text-center text-muted">{% if recherche_active %}Aucune commande ne correspond à cette recherche.{% else %}Aucune commande passée pour le moment.{% endif %}</p>
     {% endfor %}
 </div>
 
@@ -42,9 +100,17 @@
             <td><a href="{% url 'commandes:detail' commande.id %}" class="btn btn-sm btn-outline-primary">Détail</a></td>
         </tr>
         {% empty %}
-        <tr><td colspan="7" class="text-center text-muted">Aucune commande passée pour le moment.</td></tr>
+        <tr><td colspan="7" class="text-center text-muted">{% if recherche_active %}Aucune commande ne correspond à cette recherche.{% else %}Aucune commande passée pour le moment.{% endif %}</td></tr>
         {% endfor %}
     </tbody>
 </table>
 </div>
+
+{% if page.has_other_pages %}
+<nav class="d-flex justify-content-center align-items-center gap-2 mt-3" aria-label="Pages">
+    {% if page.has_previous %}<a class="btn btn-sm btn-outline-primary" href="?{% if parametres %}{{ parametres }}&{% endif %}page={{ page.previous_page_number }}">← Précédentes</a>{% endif %}
+    <span class="small text-muted">Page {{ page.number }} / {{ page.paginator.num_pages }}</span>
+    {% if page.has_next %}<a class="btn btn-sm btn-outline-primary" href="?{% if parametres %}{{ parametres }}&{% endif %}page={{ page.next_page_number }}">Suivantes →</a>{% endif %}
+</nav>
+{% endif %}
 {% endblock %}

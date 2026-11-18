@@ -151,7 +151,7 @@ def envoyer_un_par_un(destinataires, sujet, corps, type_evenement, commande=None
     return envoyes
 
 
-def envoyer_email_reclamation(reclamation, rouverte=False):
+def envoyer_email_reclamation(reclamation, rouverte=False, message=None):
     """Prévient par e-mail les adresses cochées « Réclamations » dans Paramètres.
 
     Seules ces adresses reçoivent les réclamations (pas tout le personnel) : c'est
@@ -174,7 +174,9 @@ def envoyer_email_reclamation(reclamation, rouverte=False):
     lien = settings.PUBLIC_BASE_URL.rstrip("/") + reverse("reclamations:detail", args=[reclamation.pk])
     if rouverte:
         sujet = f"[Commande FRPS] Réclamation #{reclamation.pk} rouverte - {fosa.nom}"
-        dernier = reclamation.messages.filter(de_la_fosa=True).order_by("-date").first()
+        # Le message qui rouvre est transmis par l'appelant : deux messages de la même
+        # milliseconde ont la même date, et trier dessus citait parfois l'avant-dernier.
+        dernier = message or reclamation.messages.filter(de_la_fosa=True).order_by("-date", "-pk").first()
         intro = [f"{fosa.nom} a rouvert la réclamation #{reclamation.pk} : le problème n'est pas réglé.", ""]
         texte = dernier.texte if dernier and dernier.texte else "(photo jointe, sans texte)"
         photos = list(dernier.photos.all()) if dernier else []

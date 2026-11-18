@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Créer une promotion - Commande FRPS{% endblock %}
+{% block content %}
+<h1 class="h4 app-titre mb-1">🏷️ Créer une promotion</h1>
+<p class="app-sous-titre text-muted small mb-3">
+    Choisissez le produit, son prix en promotion et la période. Pendant la période, les FOSA le voient dans
+    <a href="{% url 'catalogue:promotions' %}">Promotions</a> (offres spéciales) et le paient au prix promotionnel.
+    Les baisses du prix de vente, elles, y apparaissent toutes seules (prix en baisse).
+</p>
+
+<div class="row g-4">
+<div class="col-12 col-lg-5">
+    <h2 class="h6">Nouvelle promotion (offre spéciale)</h2>
+    <form method="post" class="app-carte p-3">
+        {% csrf_token %}
+        <div class="mb-2 position-relative">
+            <label for="produit-recherche" class="form-label small mb-1">Produit</label>
+            <input type="text" id="produit-recherche" class="form-control" autocomplete="off" required
+                   placeholder="Rechercher par nom..." value="{% if produit_choisi %}{{ produit_choisi.nom }} — {{ produit_choisi.prix_unitaire }} FCFA ({{ produit_choisi.code_sage }}){% endif %}">
+            <input type="hidden" name="produit" id="produit-id" value="{{ saisie.produit }}">
+            <div id="produit-suggestions" class="list-group position-absolute w-100 liste-suggestions"></div>
+        </div>
+        <div class="row g-2 mb-2">
+            <div class="col-12 col-sm-4">
+                <label for="prix" class="form-label small mb-1">Prix promo (FCFA)</label>
+                <input type="text" inputmode="decimal" name="prix" id="prix" class="form-control" required value="{{ saisie.prix }}">
+            </div>
+            <div class="col-6 col-sm-4">
+                <label for="debut" class="form-label small mb-1">Du</label>
+                <input type="date" name="debut" id="debut" class="form-control" required value="{% if saisie.debut %}{{ saisie.debut }}{% else %}{{ aujourdhui|date:'Y-m-d' }}{% endif %}">
+            </div>
+            <div class="col-6 col-sm-4">
+                <label for="fin" class="form-label small mb-1">Au (inclus)</label>
+                <input type="date" name="fin" id="fin" class="form-control" required value="{{ saisie.fin }}" min="{{ aujourdhui|date:'Y-m-d' }}">
+            </div>
+        </div>
+        <div class="mb-3">
+            <label for="message" class="form-label small mb-1">Message aux FOSA <span class="text-muted">(facultatif)</span></label>
+            <input type="text" name="message" id="message" class="form-control" maxlength="150" value="{{ saisie.message }}"
+                   placeholder="Ex. : Offre de fin d'année">
+        </div>
+        <button type="submit" class="btn btn-primary">🏷️ Mettre en promotion</button>
+    </form>
+</div>
+
+<div class="col-12 col-lg-7">
+    <h2 class="h6">En cours <span class="badge bg-success">{{ en_cours|length }}</span></h2>
+    {% include "catalogue/_liste_promotions.html" with promotions=en_cours arretable=True vide="Aucune promotion en cours." %}
+
+    <h2 class="h6 mt-4">À venir <span class="badge bg-body-secondary text-body-secondary">{{ a_venir|length }}</span></h2>
+    {% include "catalogue/_liste_promotions.html" with promotions=a_venir arretable=True vide="Aucune promotion programmée." %}
+
+    <h2 class="h6 mt-4">Terminées ou arrêtées</h2>
+    {% include "catalogue/_liste_promotions.html" with promotions=terminees arretable=False vide="Aucune pour le moment." %}
+</div>
+</div>
+
+{{ produits_json|json_script:"produits-data" }}
+<script src="{% static 'statistiques/js/combobox.js' %}"></script>
+<script>
+initCombobox({
+    inputId: "produit-recherche",
+    hiddenId: "produit-id",
+    listId: "produit-suggestions",
+    data: JSON.parse(document.getElementById("produits-data").textContent),
+});
+</script>
+{% endblock %}

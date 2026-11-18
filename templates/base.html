@@ -61,12 +61,16 @@
         <div class="collapse navbar-collapse" id="navPrincipale">
             <div class="d-flex flex-column flex-xl-row align-items-xl-center gap-2 ms-xl-auto">
                 {% if user.is_formation_sanitaire %}
-                <a class="nav-link doublon-onglets" href="{% url 'catalogue:liste' %}"{% if ns == "catalogue" %} aria-current="page"{% endif %}>📦 Catalogue</a>
+                <a class="nav-link doublon-onglets" href="{% url 'catalogue:liste' %}"{% if ns == "catalogue" and nom == "liste" %} aria-current="page"{% endif %}>📦 Catalogue</a>
                 <a class="nav-link doublon-onglets" href="{% url 'commandes:panier' %}"{% if ns == "commandes" and nom == "panier" %} aria-current="page"{% endif %}>
                     🛒 Panier
                     <span class="badge bg-danger" data-badge-panier id="badge-panier"{% if not panier_nb_lignes %} hidden{% endif %}>{{ panier_nb_lignes|default:0 }}</span>
                 </a>
-                <a class="nav-link doublon-onglets" href="{% url 'commandes:historique' %}"{% if ns == "commandes" and nom != "panier" or ns == "paiements" %} aria-current="page"{% endif %}>🧾 Mes commandes</a>
+                <a class="nav-link doublon-onglets" href="{% url 'commandes:historique' %}"{% if ns == "commandes" and nom != "panier" or ns == "paiements" %} aria-current="page"{% endif %}>🧾 <span class="libelle-long">Mes commandes</span><span class="libelle-court">Commandes</span></a>
+                <a class="nav-link" href="{% url 'catalogue:promotions' %}"{% if nom == "promotions" %} aria-current="page"{% endif %}>
+                    🏷️ Promotions
+                    {% if nb_promotions_menu %}<span class="badge badge-promo">{{ nb_promotions_menu }}</span>{% endif %}
+                </a>
                 <a class="nav-link" href="{% url 'reclamations:liste' %}"{% if ns == "reclamations" %} aria-current="page"{% endif %}>
                     💬 Réclamations
                     {% if reclamations_non_lues_count %}<span class="badge bg-danger">{{ reclamations_non_lues_count }}</span>{% endif %}
@@ -98,6 +102,8 @@
                     <ul class="dropdown-menu dropdown-menu-xl-end">
                         <li><a class="dropdown-item" href="{% url 'catalogue:liste' %}">📦 Voir le catalogue</a></li>
                         <li><a class="dropdown-item" href="{% url 'catalogue:importer' %}">📥 Importer les produits</a></li>
+                        <li><a class="dropdown-item" href="{% url 'catalogue:gerer_promotions' %}">➕ Créer une promotion</a></li>
+                        <li><a class="dropdown-item" href="{% url 'catalogue:promotions' %}">🏷️ Voir les promotions</a></li>
                         <li><a class="dropdown-item" href="{% url 'notifications:parametres_emails' %}">✉️ Paramètres des e-mails</a></li>
                         <li><a class="dropdown-item" href="{% url 'admin:index' %}">🛠️ Administration Django</a></li>
                     </ul>
@@ -135,7 +141,7 @@ menu complet (même panneau que l'initiale en haut à droite).
 {% endcomment %}
 <nav class="barre-onglets" aria-label="Navigation principale">
     {% if user.is_formation_sanitaire %}
-    <a class="onglet" href="{% url 'catalogue:liste' %}"{% if ns == "catalogue" %} aria-current="page"{% endif %}>
+    <a class="onglet" href="{% url 'catalogue:liste' %}"{% if ns == "catalogue" and nom == "liste" %} aria-current="page"{% endif %}>
         <span class="onglet-icone" aria-hidden="true">📦</span>Catalogue
     </a>
     <a class="onglet" href="{% url 'commandes:panier' %}"{% if ns == "commandes" and nom == "panier" %} aria-current="page"{% endif %}>

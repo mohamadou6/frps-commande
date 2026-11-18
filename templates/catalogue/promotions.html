@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Promotions - Commande FRPS{% endblock %}
+{% block content %}
+<section class="app-bandeau app-bandeau-promo mb-3">
+    <h1 class="app-bandeau-titre">🏷️ Promotions</h1>
+    <p class="app-bandeau-texte mb-0">
+        Offres spéciales du FRPS et produits dont le prix a baissé : profitez-en pour votre prochaine commande.
+    </p>
+    {% if user.is_admin_frps %}
+    <a href="{% url 'catalogue:gerer_promotions' %}" class="btn btn-light btn-sm mt-2">➕ Créer une promotion</a>
+    {% endif %}
+</section>
+
+<div class="filtres-puces mb-3" role="group" aria-label="Type de promotion">
+    <a href="{% url 'catalogue:promotions' %}" class="btn btn-sm {% if not type_affiche %}btn-primary{% else %}btn-outline-secondary{% endif %}"{% if not type_affiche %} aria-current="page"{% endif %}>
+        Toutes <span class="badge bg-body-secondary text-body-secondary">{{ nb_offres|add:nb_baisses }}</span>
+    </a>
+    <a href="?type=offre" class="btn btn-sm {% if type_affiche == 'offre' %}btn-primary{% else %}btn-outline-secondary{% endif %}"{% if type_affiche == 'offre' %} aria-current="page"{% endif %}>
+        🏷️ Offres spéciales <span class="badge bg-body-secondary text-body-secondary">{{ nb_offres }}</span>
+    </a>
+    <a href="?type=baisse" class="btn btn-sm {% if type_affiche == 'baisse' %}btn-primary{% else %}btn-outline-secondary{% endif %}"{% if type_affiche == 'baisse' %} aria-current="page"{% endif %}>
+        📉 Prix en baisse <span class="badge bg-body-secondary text-body-secondary">{{ nb_baisses }}</span>
+    </a>
+</div>
+
+{% if type_affiche != "baisse" %}
+<section class="mb-4">
+    <h2 class="h5 mb-1">🏷️ Offres spéciales</h2>
+    <p class="text-muted small mb-2">Prix réduit pour une durée limitée, appliqué aux produits ajoutés au panier pendant l'offre.</p>
+    {% if offres %}
+    <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-3 g-3 catalogue-grille"{% if user.is_formation_sanitaire %} data-ajout-instantane{% endif %}>
+        {% for produit in offres %}
+        {% include "catalogue/_fiche_produit.html" %}
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="app-carte p-3 text-muted small">Aucune offre spéciale en ce moment.</div>
+    {% endif %}
+</section>
+{% endif %}
+
+{% if type_affiche != "offre" %}
+<section class="mb-4">
+    <h2 class="h5 mb-1">📉 Prix en baisse</h2>
+    <p class="text-muted small mb-2">Le prix de vente de ces produits a baissé ces {{ duree_baisse }} derniers jours. Ce nouveau prix est durable.</p>
+    {% if baisses %}
+    <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-3 g-3 catalogue-grille"{% if user.is_formation_sanitaire %} data-ajout-instantane{% endif %}>
+        {% for produit in baisses %}
+        {% include "catalogue/_fiche_produit.html" with admin_peut_masquer="catalogue:masquer_baisse" %}
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="app-carte p-3 text-muted small">Aucune baisse de prix récente.</div>
+    {% endif %}
+</section>
+{% endif %}
+{% endblock %}

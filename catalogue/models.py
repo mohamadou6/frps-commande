@@ -81,3 +81,65 @@ class Produit(models.Model):
         if self.stock_disponible < SEUIL_STOCK_FAIBLE:
             return "faible"
         return "normal"
+
+
+# Promotions : une baisse du prix de vente reste mise en avant auprès des FOSA pendant
+# cette durée, tant que le prix ne remonte pas. En dessous du seuil, ce n'est qu'un
+# arrondi ou une correction de saisie, pas une promotion.
+PROMOTION_DUREE_JOURS = 30
+PROMOTION_SEUIL_POURCENT = 1
+
+
+class BaissePrix(models.Model):
+    """Trace d'une baisse du prix de vente, enregistrée à l'import Excel, dans l'admin
+    ou par update_stock (catalogue/services.py noter_baisses_prix). C'est elle qui
+    alimente le menu Promotions des FOSA."""
+
+    produit = models.ForeignKey(Produit, on_delete=models.CASCADE, related_name="baisses_prix")
+    ancien_prix = models.DecimalField(max_digits=12, decimal_places=2)
+    nouveau_prix = models.DecimalField(max_digits=12, decimal_places=2)
+    date = models.DateTimeField(auto_now_add=True, db_index=True)
+    visible = models.BooleanField(
+        "Affichée aux FOSA", default=True, help_text="Décocher pour retirer cette baisse du menu Promotions"
+    )
+
+    class Meta:
+        verbose_name = "Baisse de prix (promotion)"
+        verbose_name_plural = "Baisses de prix (promotions)"
+        ordering = ["-date"]
+
+    def __str__(self):
+        return f"{self.produit.nom} : {self.ancien_prix} → {self.nouveau_prix}"
+
+
+class Promotion(models.Model):
+    """Prix promotionnel décidé par l'admin FRPS pour une période. Pendant la période,
+    c'est ce prix que la FOSA paie (catalogue/services.py prix_de_vente) : il est
+    figé dans la ligne de commande à l'ajout au panier, comme tout prix."""
+
+    produit = models.ForeignKey(Produit, on_delete=models.CASCADE, related_name="promotions")
+    prix_promotionnel = models.DecimalField(max_digits=12, decimal_places=2)
+    date_debut = models.DateField()
+    date_fin = models.DateField(help_text="Dernier jour inclus")
+    message = models.CharField(
+        max_length=150, blank=True, help_text="Facultatif, affiché aux FOSA. Ex. : Offre de fin d'année"
+    )
+    active = models.BooleanField(default=True, help_text="Décocher pour arrêter la promotion avant sa fin")
+    creee_par = models.ForeignKey(
+        "accounts.User", on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
+    date_creation = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Promotion"
+        verbose_name_plural = "Promotions"
+        ordering = ["-date_debut", "produit__nom"]
+
+    def __str__(self):
+        return f"{self.produit.nom} à {self.prix_promotionnel} FCFA ({self.date_debut} → {self.date_fin})"
+
+    @property
+    def pourcentage(self):
+        if not self.produit.prix_unitaire:
+            return 0
+        return round((1 - self.prix_promotionnel / self.produit.prix_unitaire) * 100)

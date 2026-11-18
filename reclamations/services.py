@@ -141,17 +141,17 @@ def message_fosa(reclamation, auteur, texte, photos=None):
     # E-mail seulement à la réouverture : un simple message de suivi n'en vaut pas un,
     # le push et la pastille suffisent.
     if rouverte:
-        _envoyer_email(reclamation, rouverte=True)
+        _envoyer_email(reclamation, rouverte=True, message=message)
     return reclamation
 
 
-def _envoyer_email(reclamation, rouverte=False):
+def _envoyer_email(reclamation, rouverte=False, message=None):
     """Hors transaction et sans jamais lever : la réclamation est enregistrée, un
     relais SMTP en panne ne doit pas faire croire à la FOSA qu'elle ne l'est pas."""
     from notifications.emails import envoyer_email_reclamation
 
     try:
-        envoyer_email_reclamation(reclamation, rouverte=rouverte)
+        envoyer_email_reclamation(reclamation, rouverte=rouverte, message=message)
     except Exception:  # noqa: BLE001
         logger.exception("Réclamation #%s : envoi des emails interrompu", reclamation.pk)
 

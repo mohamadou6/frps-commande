@@ -77,6 +77,7 @@ TEMPLATES = [
                 'notifications.context_processors.notifications_non_lues',
                 'commandes.context_processors.panier_resume',
                 'reclamations.context_processors.reclamations_non_lues',
+                'catalogue.context_processors.offres',
             ],
         },
     },

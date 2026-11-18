@@ -2,6 +2,7 @@ import json
 import uuid
 
 from django.contrib import messages
+from django.core.paginator import Paginator
 from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -17,7 +18,7 @@ from catalogue.models import Produit
 from frps_project.formatage import formater_montant, formater_prix
 from notifications.pdf import generer_pdf_commande, verifier_token_pdf
 
-from . import services
+from . import recherche, services
 from .models import Commande, EtapeTraitement, StatutCommande
 
 
@@ -217,9 +218,29 @@ def historique(request):
         Commande.objects.filter(formation_sanitaire=request.user.formation_sanitaire)
         .exclude(statut=StatutCommande.BROUILLON)
         .select_related("paiement")
-        .order_by("-date_creation")
     )
-    return render(request, "commandes/historique.html", {"commandes": commandes})
+    commandes, criteres, erreurs = recherche.filtrer_commandes(commandes, request.GET)
+    for erreur in erreurs:
+        messages.warning(request, erreur)
+    page = Paginator(commandes, 25).get_page(request.GET.get("page"))
+    # Paramètres de recherche à garder dans les liens de pagination.
+    parametres = request.GET.copy()
+    parametres.pop("page", None)
+    return render(
+        request,
+        "commandes/historique.html",
+        {
+            "commandes": page.object_list,
+            "page": page,
+            "parametres": parametres.urlencode(),
+            "criteres": criteres,
+            "recherche_active": any(criteres[c] for c in recherche.CHAMPS if c != "tri") or criteres["tri"] != "recent",
+            "resume": recherche.resume(commandes),
+            "tris": [(code, libelle) for code, (libelle, _ordre) in recherche.TRIS.items()],
+            "etapes": EtapeTraitement.choices,
+            "etats_paiement": recherche.ETATS_PAIEMENT,
+        },
+    )
 
 
 @formation_sanitaire_only_required

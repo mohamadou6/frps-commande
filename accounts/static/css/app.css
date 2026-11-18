@@ -196,19 +196,15 @@ a.card:hover {
 /* Titre long seulement quand il y a la place : il occupait deux lignes sur
    téléphone et repoussait les liens du personnel (six menus) hors de l'écran. */
 .marque-longue { display: none; }
-@media (min-width: 1200px) {
-    .app-navbar:not(.nav-personnel) .marque-longue { display: inline; }
-    .app-navbar:not(.nav-personnel) .marque-courte { display: none; }
-}
 @media (min-width: 1600px) {
-    .nav-personnel .marque-longue { display: inline; }
-    .nav-personnel .marque-courte { display: none; }
+    .app-navbar .marque-longue { display: inline; }
+    .app-navbar .marque-courte { display: none; }
 }
 /* Ordinateur : la barre du personnel (six menus, le nom, la déconnexion) débordait
    de l'écran. Liens un peu resserrés, nom trop long abrégé. */
 @media (min-width: 1200px) {
     .app-navbar #navPrincipale > div { gap: .3rem !important; }
-    .app-navbar .nav-link { padding: .4rem .6rem !important; }
+    .app-navbar #navPrincipale .nav-link { padding: .4rem .6rem !important; }
     .app-navbar .user-pill { max-width: 15rem; }
 }
 /* La barre prend la largeur de l'écran (jusqu'à 1 680 px) et non les 1 140 px du
@@ -219,19 +215,33 @@ a.card:hover {
    dans le panneau du téléphone (sous 1 200 px), où la place ne manque pas. */
 .libelle-court, .icone-deconnexion { display: none; }
 @media (min-width: 1200px) and (max-width: 1599.98px) {
-    .nav-personnel .libelle-long, .nav-personnel .libelle-deconnexion { display: none; }
-    .nav-personnel .libelle-court, .nav-personnel .icone-deconnexion { display: inline; }
-    .nav-personnel .bouton-deconnexion { width: 2.1rem; height: 2.1rem; padding: 0; font-size: 1rem; line-height: 1; }
+    .app-navbar .libelle-long, .app-navbar .libelle-deconnexion { display: none; }
+    .app-navbar .libelle-court, .app-navbar .icone-deconnexion { display: inline; }
+    .app-navbar .bouton-deconnexion { width: 2.1rem; height: 2.1rem; padding: 0; font-size: 1rem; line-height: 1; }
 }
 @media (min-width: 1200px) and (max-width: 1399.98px) {
     /* Le rôle et l'initiale suffisent : le nom complet reste au survol (title). */
-    .nav-personnel .user-pill .user-nom { display: none; }
-    .nav-personnel .user-pill { padding-right: .5rem; }
+    .app-navbar .user-pill .user-nom { display: none; }
+    .app-navbar .user-pill { padding-right: .5rem; }
 }
 @media (min-width: 1200px) and (max-width: 1299.98px) {
-    .nav-personnel #navPrincipale > div { gap: .15rem !important; }
-    .nav-personnel .nav-link { padding: .4rem .45rem !important; }
-    .nav-personnel .conteneur-nav { padding-inline: 1rem; }
+    .app-navbar #navPrincipale > div { gap: .15rem !important; }
+    .app-navbar #navPrincipale .nav-link { padding: .4rem .45rem !important; }
+    .app-navbar .conteneur-nav { padding-inline: 1rem; }
+}
+/* Déconnexion en rouge sur ordinateur (demandé le 2026-11-18) : bien distincte des liens. */
+@media (min-width: 1200px) {
+    .app-navbar .bouton-deconnexion {
+        background: #dc3545;
+        border-color: #dc3545;
+        color: #fff;
+    }
+    .app-navbar .bouton-deconnexion:hover,
+    .app-navbar .bouton-deconnexion:focus-visible {
+        background: #b02a37;
+        border-color: #b02a37;
+        color: #fff;
+    }
 }
 .app-navbar .nav-icone { font-size: 1.05rem; }
 .app-navbar .nav-icone .badge { font-size: .65rem; }
@@ -1016,6 +1026,54 @@ a.card:hover {
     .filtres-puces > * { flex-shrink: 0; }
 }
 .champ-recherche { max-width: 400px; }
+
+/* ---------- Recherche dans Mes commandes (repliable) ---------- */
+.recherche-commandes { padding: .75rem 1rem; }
+.recherche-commandes > summary {
+    cursor: pointer;
+    font-weight: 600;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+}
+.recherche-commandes > summary::-webkit-details-marker { display: none; }
+.recherche-commandes > summary::after { content: "▾"; margin-left: auto; color: var(--app-texte-2); }
+.recherche-commandes[open] > summary::after { content: "▴"; }
+
+/* ---------- Promotions et baisses de prix ---------- */
+.etiquette-offre {
+    display: inline-block;
+    align-self: flex-start;
+    margin-top: .35rem;
+    padding: .15rem .55rem;
+    border-radius: 999px;
+    font-size: .75rem;
+    font-weight: 700;
+}
+.etiquette-promo { background: #e8590c; color: #fff; }
+.etiquette-baisse { background: var(--app-teinte-bleu); color: var(--app-texte); border: 1px solid var(--app-teinte-bleu-bord); }
+.produit-card.en-promotion { box-shadow: 0 0 0 2px #e8590c, var(--app-ombre); }
+.prix-barre { color: var(--app-texte-2); font-weight: 400; font-size: .85em; margin-right: .25rem; }
+/* Bandeau du catalogue qui mène aux promotions : orange pour trancher sur le vert. */
+.bandeau-promotions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .5rem .9rem;
+    padding: .8rem 1rem;
+    border-radius: 16px;
+    background: linear-gradient(90deg, #e8590c, #f08c00);
+    color: #fff;
+    text-decoration: none;
+    box-shadow: var(--app-ombre);
+}
+.bandeau-promotions:hover { color: #fff; filter: brightness(1.05); }
+.bandeau-promotions-icone { font-size: 1.5rem; line-height: 1; }
+.bandeau-promotions-lien { margin-left: auto; font-weight: 700; white-space: nowrap; }
+.app-bandeau-promo { background: linear-gradient(120deg, #c2410c, #e8590c 55%, #f08c00); }
+.badge-promo { background: #e8590c; color: #fff; }
+.liste-suggestions { z-index: 1000; max-height: 320px; overflow-y: auto; display: none; }
 
 /* Laisse un élément flexible rétrécir (sinon text-truncate ne coupe rien). */
 .min-w-0 { min-width: 0; }

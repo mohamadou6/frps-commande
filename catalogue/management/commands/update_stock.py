@@ -117,12 +117,18 @@ class Command(BaseCommand):
                     f"{code_sage} ({produit.nom}) : prix {produit.prix_unitaire}->{prix}, "
                     f"stock {produit.stock_disponible}->{stock}"
                 )
+            if prix < produit.prix_unitaire:
+                baisses.append((produit, produit.prix_unitaire, prix))
             produit.prix_unitaire = prix
             produit.stock_disponible = stock
             a_modifier.append(produit)
 
         if not dry_run and a_modifier:
-            Produit.objects.bulk_update(a_modifier, ["prix_unitaire", "stock_disponible"], batch_size=200)
+            with transaction.atomic():
+                Produit.objects.bulk_update(a_modifier, ["prix_unitaire", "stock_disponible"], batch_size=200)
+                nb_promotions = noter_baisses_prix(baisses)
+            if nb_promotions:
+                self.stdout.write(f"{nb_promotions} baisse(s) de prix ajoutée(s) aux Promotions des FOSA.")
 
         verbe = "à modifier (dry-run)" if dry_run else "modifiés"
         self.stdout.write(self.style.SUCCESS(
