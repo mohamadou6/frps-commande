@@ -14,7 +14,7 @@ from accounts.decorators import admin_frps_required, formation_sanitaire_require
 from commandes.models import Commande, StatutCommande
 
 from .models import Magasin, Produit, Promotion, Rayon
-from . import services
+from . import espace_fosa, recherche, services
 from .services import noter_baisses_prix
 
 SLUG_AUTRES = "autres"
@@ -48,8 +48,20 @@ def liste(request):
         produits = produits.filter(rayon__isnull=True)
     elif rayon_slug:
         produits = produits.filter(rayon__slug=rayon_slug)
-    if query:
-        produits = produits.filter(nom__icontains=query)
+    # Recherche tolérante (catalogue/recherche.py), mêmes règles que la recherche
+    # instantanée du téléphone. Faite en Python : quelques centaines de produits.
+    produits = recherche.filtrer(produits.select_related("rayon"), query)
+
+    # Produits en rupture qui correspondent à la recherche : la FOSA peut demander à
+    # être prévenue de leur retour (sinon, absents du catalogue, elle ne les voit pas).
+    ruptures = []
+    if query and request.user.is_formation_sanitaire:
+        ruptures = recherche.filtrer(espace_fosa.produits_en_rupture().order_by("nom"), query)[:12]
+        suivis = set(
+            request.user.formation_sanitaire.alertes_stock.filter(produit__in=ruptures).values_list("produit_id", flat=True)
+        )
+        for produit in ruptures:
+            produit.alerte_demandee = produit.pk in suivis
 
     rayon_actif = next((r for r in rayons if r.slug == rayon_slug), None)
 
@@ -66,14 +78,15 @@ def liste(request):
         if panier:
             quantites_panier = dict(panier.lignes.values_list("produit_id", "quantite"))
 
-    produits = list(produits)
-    _annoter_offres(produits, quantites_panier)
+    _annoter_offres(produits, quantites_panier, request)
 
     return render(
         request,
         "catalogue/liste.html",
         {
             "produits": produits,
+            "ruptures": ruptures,
+            "synonymes_json": recherche.synonymes_json(),
             "query": query,
             "rayons": rayons,
             "rayon_actif": rayon_actif,
@@ -94,19 +107,9 @@ def _quantites_panier(request):
     return dict(panier.lignes.values_list("produit_id", "quantite")) if panier else {}
 
 
-def _annoter_offres(produits, quantites_panier):
-    """Pose sur chaque fiche : quantité au panier, prix du jour (promotion comprise)
-    et pourcentage de la promotion ou de la baisse récente, pour les étiquettes."""
-    promos = services.prix_promotionnels([p.pk for p in produits])
-    baisses = {p.pk: p.pourcentage_baisse for p in services.baisses_prix_recentes()}
-    for produit in produits:
-        produit.quantite_panier = quantites_panier.get(produit.pk, 0)
-        produit.prix_du_jour = services.prix_de_vente(produit, promos)
-        produit.en_promotion = produit.pk in promos
-        produit.pourcentage_promotion = (
-            round((1 - produit.prix_du_jour / produit.prix_unitaire) * 100) if produit.en_promotion else None
-        )
-        produit.pourcentage_baisse = baisses.get(produit.pk)
+def _annoter_offres(produits, quantites_panier, request=None):
+    fosa = request.user.fiche_fosa if request is not None and request.user.is_formation_sanitaire else None
+    services.annoter_fiches(produits, quantites_panier, fosa)
 
 
 @formation_sanitaire_required
@@ -120,8 +123,8 @@ def promotions(request):
     for promo, produit in zip(offres, produits_offres):
         produit.promotion = promo
     quantites = _quantites_panier(request)
-    _annoter_offres(produits_offres, quantites)
-    _annoter_offres(baisses, quantites)
+    _annoter_offres(produits_offres, quantites, request)
+    _annoter_offres(baisses, quantites, request)
 
     type_affiche = request.GET.get("type", "")
     if type_affiche not in ("offre", "baisse"):
@@ -358,6 +361,9 @@ def importer_produits(request):
                             request,
                             f"{nb_promotions} baisse(s) de prix ajoutée(s) aux Promotions des FOSA (type « prix en baisse »).",
                         )
+                    nb_alertes = espace_fosa.traiter_retours_en_stock()
+                    if nb_alertes:
+                        messages.info(request, f"{nb_alertes} alerte(s) de retour en stock envoyée(s) aux FOSA.")
                 if a_creer:
                     Produit.objects.bulk_create(a_creer, batch_size=200)
 

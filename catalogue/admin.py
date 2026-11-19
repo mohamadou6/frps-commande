@@ -1,6 +1,7 @@
 from django.contrib import admin
 
-from .models import BaissePrix, Produit, Rayon
+from .models import AlerteStock, BaissePrix, CommandeMensuelle, Produit, ProduitHabituel, Promotion, Rayon
+from .espace_fosa import traiter_retours_en_stock
 from .services import noter_baisses_prix
 
 
@@ -26,6 +27,9 @@ class ProduitAdmin(admin.ModelAdmin):
         super().save_model(request, obj, form, change)
         if change and "prix_unitaire" in form.changed_data and ancien_prix is not None:
             noter_baisses_prix([(obj, ancien_prix, obj.prix_unitaire)])
+        # Stock remis à la main : prévenir les FOSA qui attendaient ce produit.
+        if "stock_disponible" in form.changed_data or "actif" in form.changed_data:
+            traiter_retours_en_stock()
 
 
 @admin.register(BaissePrix)
@@ -38,3 +42,36 @@ class BaissePrixAdmin(admin.ModelAdmin):
     search_fields = ("produit__nom", "produit__code_sage")
     raw_id_fields = ("produit",)
     readonly_fields = ("date",)
+
+
+@admin.register(Promotion)
+class PromotionAdmin(admin.ModelAdmin):
+    """Aussi gérable dans l'application : Administration > Créer une promotion."""
+
+    list_display = ("produit", "prix_promotionnel", "date_debut", "date_fin", "active", "creee_par")
+    list_filter = ("active",)
+    search_fields = ("produit__nom",)
+    raw_id_fields = ("produit",)
+
+
+@admin.register(AlerteStock)
+class AlerteStockAdmin(admin.ModelAdmin):
+    """Demandes de retour en stock : montre au FRPS les ruptures les plus attendues."""
+
+    list_display = ("produit", "formation_sanitaire", "date_demande", "date_notification")
+    list_filter = ("date_notification",)
+    search_fields = ("produit__nom", "formation_sanitaire__nom")
+    raw_id_fields = ("produit", "formation_sanitaire")
+
+
+@admin.register(ProduitHabituel)
+class ProduitHabituelAdmin(admin.ModelAdmin):
+    list_display = ("formation_sanitaire", "produit", "quantite")
+    search_fields = ("produit__nom", "formation_sanitaire__nom")
+    raw_id_fields = ("produit", "formation_sanitaire")
+
+
+@admin.register(CommandeMensuelle)
+class CommandeMensuelleAdmin(admin.ModelAdmin):
+    list_display = ("formation_sanitaire", "jour_du_mois", "active", "dernier_mois_prepare")
+    list_filter = ("active",)

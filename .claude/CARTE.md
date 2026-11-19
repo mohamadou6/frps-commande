@@ -1,10 +1,10 @@
 # Carte du code — commande-frps
 
-<!-- Genere par la skill carte-du-code le 2026-11-18. NE PAS EDITER A LA MAIN : relancer scripts/generer_carte.py. -->
+<!-- Genere par la skill carte-du-code le 2026-11-19. NE PAS EDITER A LA MAIN : relancer scripts/generer_carte.py. -->
 
 **Lire ce fichier avant d'explorer le depot.** Il donne `fichier:ligne` pour chaque modele, URL, vue et fonction.
 
-10 modules · 19 modeles · 64 URLs · 173 fonctions · 35 gabarits · 9463 lignes de Python
+10 modules · 22 modeles · 71 URLs · 212 fonctions · 38 gabarits · 10576 lignes de Python
 
 ## accounts (514 lignes)
 
@@ -58,15 +58,36 @@
 - *classe* **LoginView**(LoginView) :10 — Redirige après connexion selon le rôle : catalogue pour les formations
   - methodes : get_success_url() :22
 
-## catalogue (1587 lignes)
+## catalogue (2652 lignes)
 
-### `catalogue/admin.py` (41 l.)
-- *admin* **RayonAdmin** :8 — list_editable=ordre
-- *admin* **ProduitAdmin** :15 — list_editable=prix_unitaire, stock_disponible, magasin, rayon, actif
-- *admin* **BaissePrixAdmin** :32 — list_editable=visible
+### `catalogue/admin.py` (78 l.)
+- *admin* **RayonAdmin** :9 — list_editable=ordre
+- *admin* **ProduitAdmin** :16 — list_editable=prix_unitaire, stock_disponible, magasin, rayon, actif
+- *admin* **BaissePrixAdmin** :36 — list_editable=visible
+- *admin* **PromotionAdmin** :48
+- *admin* **AlerteStockAdmin** :58
+- *admin* **ProduitHabituelAdmin** :68
+- *admin* **CommandeMensuelleAdmin** :75
 
-### `catalogue/context_processors.py` (11 l.)
-- `offres(request)` :4 — Nombre de promotions (offres spéciales + prix en baisse), pour la pastille du menu des FOSA. `fiche_fosa`
+### `catalogue/context_processors.py` (52 l.)
+- `offres(request)` :10 — Pour les FOSA, sur toutes les pages : nombre de promotions (pastille du menu)
+
+### `catalogue/espace_fosa.py` (295 l.)
+- `produits_commandables()` :18
+- `produits_en_rupture()` :22 — Produits du catalogue momentanément indisponibles : ceux qu'une FOSA peut suivre.
+- `demander_alerte(formation_sanitaire, produit)` :30
+- `annuler_alerte(formation_sanitaire, produit)` :42
+- `traiter_retours_en_stock()` :46 — Prévient les FOSA dont un produit attendu est revenu en stock : un seul push et
+- `ajouter_habituel(formation_sanitaire, produit, quantite)` :109
+- `retirer_habituel(formation_sanitaire, produit)` :117
+- `modifier_quantites_habituelles(formation_sanitaire, quantites)` :121 — `quantites` : {produit_id: quantité}. Une quantité à 0 retire le produit.
+- `produits_les_plus_commandes(formation_sanitaire, limite)` :134 — Produits que la FOSA a le plus commandés (en nombre de commandes), pour
+- `preremplir_habituels(formation_sanitaire)` :157 — Ajoute à la liste les produits les plus commandés qui n'y sont pas encore.
+- `mettre_habituels_au_panier(formation_sanitaire)` :166 — Ajoute au panier chaque produit habituel disponible, à sa quantité habituelle
+- `suggestions(formation_sanitaire, exclure_ids, limite)` :196 — Produits à proposer à la FOSA, commandables et absents de `exclure_ids` :
+- `programmer_commande_mensuelle(formation_sanitaire, jour, active)` :257
+- `preparer_si_echue(formation_sanitaire, aujourdhui)` :270 — Prépare la commande du mois si le jour choisi est atteint et qu'elle ne l'a pas
+- *const* `FENETRE_SUGGESTIONS_JOURS = 90` :193
 
 ### `catalogue/management/commands/import_catalogue.py` (70 l.)
 - *classe* **Command**(BaseCommand) :21 — Importe/actualise le catalogue depuis catalogue/data/produits_magasin_principal.csv
@@ -76,13 +97,13 @@
 - *classe* **Command**(BaseCommand) :23 — Crée/actualise les rayons puis rattache les produits selon
   - methodes : handle() :31
 
-### `catalogue/management/commands/update_stock.py` (137 l.)
-- *classe* **Command**(BaseCommand) :72 — Met à jour prix_unitaire/stock_disponible depuis un fichier CSV fourni par
-  - methodes : add_arguments() :86, handle() :90
-- `_read_updates_with_code_sage(path)` :23 — Fichier avec code_sage (colonnes code_sage;nom;...;prix_unitaire;stock_disponible,
-- `_read_updates_by_position(update_csv)` :45 — Fichier sans code_sage (colonnes nom;prix_unitaire;stock_disponible). Le nom seul
+### `catalogue/management/commands/update_stock.py` (144 l.)
+- *classe* **Command**(BaseCommand) :75 — Met à jour prix_unitaire/stock_disponible depuis un fichier CSV fourni par
+  - methodes : add_arguments() :89, handle() :93
+- `_read_updates_with_code_sage(path)` :26 — Fichier avec code_sage (colonnes code_sage;nom;...;prix_unitaire;stock_disponible,
+- `_read_updates_by_position(update_csv)` :48 — Fichier sans code_sage (colonnes nom;prix_unitaire;stock_disponible). Le nom seul
 
-### `catalogue/models.py` (146 l.)
+### `catalogue/models.py` (210 l.)
 - *enum* **Magasin** :11 — PRINCIPAL, UCPC, AUTRE
 - *modele* **Rayon** :17 — Rayon de classification du catalogue (ex. Injectables, Comprimés).
   - champs : slug(Slug), nom(Char), icone(Char), ordre(PositiveSmallInteger)
@@ -94,12 +115,28 @@
 - *modele* **Promotion** :115 — Prix promotionnel décidé par l'admin FRPS pour une période. Pendant la période,
   - champs : produit(ForeignKey ->Produit related_name=promotions), prix_promotionnel(Decimal), date_debut(Date), date_fin(Date), message(Char), active(Boolean), creee_par(ForeignKey ->accounts.User related_name=+), date_creation(DateTime)
   - methodes : pourcentage() :142
+- *modele* **AlerteStock** :148 — « Prévenez-moi quand c'est disponible » : une FOSA demande à être avertie du
+  - champs : formation_sanitaire(ForeignKey ->accounts.FormationSanitaire related_name=alertes_stock), produit(ForeignKey ->Produit related_name=alertes_stock), date_demande(DateTime), date_notification(DateTime)
+- *modele* **ProduitHabituel** :170 — « Mes produits habituels » : liste personnelle d'une FOSA, avec la quantité
+  - champs : formation_sanitaire(ForeignKey ->accounts.FormationSanitaire related_name=produits_habituels), produit(ForeignKey ->Produit related_name=habituels), quantite(PositiveInteger), date_ajout(DateTime)
+- *modele* **CommandeMensuelle** :191 — Commande programmée : chaque mois, à partir du jour choisi, le panier de la FOSA
+  - champs : formation_sanitaire(OneToOne ->accounts.FormationSanitaire related_name=commande_mensuelle), jour_du_mois(PositiveSmallInteger), active(Boolean), dernier_mois_prepare(Date)
 - *const* `SEUIL_STOCK_CRITIQUE = 10` :7
 - *const* `SEUIL_STOCK_FAIBLE = 50` :8
 - *const* `PROMOTION_DUREE_JOURS = 30` :89
 - *const* `PROMOTION_SEUIL_POURCENT = 1` :90
 
-### `catalogue/services.py` (206 l.)
+### `catalogue/recherche.py` (122 l.)
+- `normaliser(texte)` :42
+- `mots(texte)` :49
+- `compact(texte)` :53
+- `synonymes_json()` :69 — Pour le téléphone (attribut data de la page), afin d'appliquer la même règle.
+- `_au_plus_une_faute(a, b)` :74 — Vrai si a et b diffèrent d'au plus une lettre (ajout, retrait ou remplacement).
+- `correspond(mot, nom_compact)` :109
+- `filtrer(produits, requete)` :115 — Produits (liste ou queryset) dont le nom contient tous les mots de `requete`,
+- *const* `TOLERANCE_LONGUEUR_MIN = 5` :36
+
+### `catalogue/services.py` (238 l.)
 - `_promotions_du_jour()` :35 — Promotions actives aujourd'hui dont le prix est encore sous le prix normal (si
 - `promotions_en_cours()` :48 — Promotions visibles des FOSA : en cours et sur un produit commandable.
 - `prix_promotionnels(produit_ids)` :58 — {produit_id: prix promotionnel} des promotions du jour. Une seule requête pour
@@ -111,6 +148,7 @@
 - `masquer_baisse(produit)` :183 — Retire un produit du menu Baisses de prix (toutes ses baisses de la période).
 - `toutes_les_promotions()` :189 — Les deux types de promotion présentés aux FOSA dans le menu Promotions :
 - `nombre_promotions()` :201 — Total des deux types, pour la pastille du menu et le bandeau du catalogue.
+- `annoter_fiches(produits, quantites_panier, formation_sanitaire)` :211 — Prépare des produits pour catalogue/_fiche_produit.html : quantité au panier,
 
 ### `catalogue/tests.py` (198 l.)
 - *classe* **ImportVariationDePrixTests**(TestCase) :28 — L'import signale en couleur chaque prix qui monte ou qui baisse.
@@ -124,6 +162,23 @@
 - *classe* **MigrationRayonsQuatreDerniersProduitsTests**(TestCase) :171 — Les 4 produits absents du fichier du 25/10/2026 : plus aucun produit sans rayon.
   - tests : test_range_les_quatre_produits_dans_le_rayon_prevu, test_n_ecrase_pas_un_rayon_deja_choisi_a_la_main, test_ne_cite_que_des_rayons_existants
 
+### `catalogue/tests_espace.py` (285 l.)
+- *classe* **RechercheTolerante**(TestCase) :34 — Mêmes règles que accounts/static/js/app.js : si l'un change, l'autre aussi.
+  - tests : test_accents_majuscules_et_mots_dans_le_desordre, test_lettres_doublees, test_une_faute_toleree_des_5_lettres, test_les_chiffres_ne_sont_pas_fusionnes, test_synonymes, test_les_synonymes_sont_transmis_au_telephone
+- *classe* **EspaceFosaBase**(TestCase) :66
+- *classe* **AlertesStockTests**(EspaceFosaBase) :79
+  - methodes : test_la_recherche_du_catalogue_propose_les_produits_en_rupture() :80, test_demander_puis_annuler_une_alerte() :85, test_pas_d_alerte_sur_un_produit_disponible() :91, test_retour_en_stock_un_seul_sms_et_un_seul_push_par_fosa() :96, test_l_import_excel_declenche_les_alertes() :112, test_une_alerte_se_rearme_pour_le_retour_suivant() :118, test_reserve_aux_fosa_et_en_post() :127
+- *classe* **HabituelsTests**(EspaceFosaBase) :136
+  - methodes : test_etoile_ajoute_puis_retire() :137, test_retour_vers_une_adresse_externe_refuse() :145, test_tout_mettre_au_panier_plafonne_et_ignore_les_ruptures() :149, test_modifier_les_quantites_et_retirer_avec_zero() :157, test_preremplir_avec_les_produits_les_plus_commandes() :166
+- *classe* **SuggestionsTests**(EspaceFosaBase) :175
+  - methodes : setUp() :176, test_souvent_commande_avec_le_panier() :185, test_populaire_dans_le_district_sans_panier() :190, test_jamais_un_produit_en_rupture() :195, test_affichees_sur_la_page_du_panier() :199
+- *classe* **CommandeMensuelleTests**(EspaceFosaBase) :204
+  - methodes : setUp() :205, test_jour_hors_bornes_refuse() :209, test_preparee_une_seule_fois_par_mois_a_partir_du_jour() :213, test_jamais_validee_a_la_place_de_la_fosa() :221, test_preparee_a_la_visite_avec_un_message() :226, test_desactivee_rien_ne_se_passe() :232
+- *classe* **PushFosaTests**(EspaceFosaBase) :238
+  - methodes : test_la_fosa_recoit_la_cle_et_le_bandeau() :239, test_la_fosa_peut_enregistrer_un_appareil() :244, test_compte_fosa_sans_fiche_refuse() :250, test_push_a_la_fosa_quand_sa_commande_est_prete() :258
+- *classe* **UpdateStockTests**(EspaceFosaBase) :272 — Régression : la commande plantait (imports manquants) dès qu'un prix baissait.
+  - methodes : test_baisse_et_retour_en_stock_par_la_commande() :275
+
 ### `catalogue/tests_import.py` (84 l.)
 - *classe* **ImportProduitsTests**(TestCase) :25 — Import Excel des prix et du stock par l'admin FRPS : la seule façon de mettre
   - tests : test_met_a_jour_prix_et_stock, test_colonnes_dans_un_autre_ordre_et_intitules_proches, test_cree_un_produit_inconnu_avec_son_nom, test_lignes_vides_et_codes_vides_ignores, test_colonne_manquante_ne_change_rien, test_un_fichier_qui_n_est_pas_excel_est_refuse, test_reserve_a_l_admin
@@ -134,27 +189,43 @@
 - *classe* **BaissePrixTests**(TestCase) :152 — Baisses durables du prix de vente : détectées seules, signalées à part des promotions.
   - tests : test_import_excel_enregistre_les_baisses_seulement, test_baisse_infime_ignoree, test_baisse_dans_l_admin_django_enregistree, test_la_baisse_est_un_type_de_promotion, test_produit_en_offre_speciale_pas_repete_dans_les_baisses, test_compteur_du_menu_compte_les_deux_types, test_prix_remonte_plus_signale, test_baisse_ancienne_plus_signalee, test_l_admin_masque_une_baisse
 
-### `catalogue/urls.py` (15 l.)
+### `catalogue/urls.py` (23 l.)
 - URL `''` -> views.liste  `catalogue:liste` :8
 - URL `importer/` -> views.importer_produits  `catalogue:importer` :9
 - URL `promotions/` -> views.promotions  `catalogue:promotions` :10
 - URL `promotions/gerer/` -> views.gerer_promotions  `catalogue:gerer_promotions` :11
 - URL `promotions/<int:promotion_id>/arreter/` -> views.arreter_promotion  `catalogue:arreter_promotion` :12
 - URL `promotions/baisse/<int:produit_id>/masquer/` -> views.masquer_baisse  `catalogue:masquer_baisse` :13
+- URL `alertes/` -> views_espace.alertes  `catalogue:alertes` :15
+- URL `alertes/<int:produit_id>/demander/` -> views_espace.demander_alerte  `catalogue:demander_alerte` :16
+- URL `alertes/<int:produit_id>/annuler/` -> views_espace.annuler_alerte  `catalogue:annuler_alerte` :17
+- URL `habituels/` -> views_espace.habituels  `catalogue:habituels` :18
+- URL `habituels/<int:produit_id>/basculer/` -> views_espace.basculer_habituel  `catalogue:basculer_habituel` :19
+- URL `habituels/preremplir/` -> views_espace.preremplir_habituels  `catalogue:preremplir_habituels` :20
+- URL `habituels/commande-mensuelle/` -> views_espace.programmer_commande  `catalogue:programmer_commande` :21
 
-### `catalogue/views.py` (390 l.)
+### `catalogue/views.py` (396 l.)
 - `liste(request)` :24 @formation_sanitaire_required
-- `_quantites_panier(request)` :86 — Quantités déjà au panier de la FOSA ({produit_id: quantité}). L'admin FRPS n'a
-- `_annoter_offres(produits, quantites_panier)` :97 — Pose sur chaque fiche : quantité au panier, prix du jour (promotion comprise)
-- `promotions(request)` :113 @formation_sanitaire_required — Menu Promotions des FOSA, deux types :
-- `masquer_baisse(request, produit_id)` :145 @admin_frps_required @require_POST
-- `gerer_promotions(request)` :153 @admin_frps_required — Mettre un produit en promotion (prix promotionnel + période) et suivre les
-- `arreter_promotion(request, promotion_id)` :207 @admin_frps_required @require_POST
-- `_lire_fichier_produits(fichier)` :230 — Lit un classeur Excel dont l'en-tête contient une colonne code produit
-- `importer_produits(request)` :286 @admin_frps_required
+- `_quantites_panier(request)` :99 — Quantités déjà au panier de la FOSA ({produit_id: quantité}). L'admin FRPS n'a
+- `promotions(request)` :116 @formation_sanitaire_required — Menu Promotions des FOSA, deux types :
+- `masquer_baisse(request, produit_id)` :148 @admin_frps_required @require_POST
+- `gerer_promotions(request)` :156 @admin_frps_required — Mettre un produit en promotion (prix promotionnel + période) et suivre les
+- `arreter_promotion(request, promotion_id)` :210 @admin_frps_required @require_POST
+- `_lire_fichier_produits(fichier)` :233 — Lit un classeur Excel dont l'en-tête contient une colonne code produit
+- `importer_produits(request)` :289 @admin_frps_required
 - *const* `SLUG_AUTRES = 'autres'` :20
 
-## commandes (2074 lignes)
+### `catalogue/views_espace.py` (168 l.)
+- `_retour(request, defaut)` :14 — Revient à la page d'où vient le clic (catalogue filtré, promotions…), jamais
+- `alertes(request)` :45 @formation_sanitaire_only_required
+- `demander_alerte(request, produit_id)` :68 @formation_sanitaire_only_required @require_POST
+- `annuler_alerte(request, produit_id)` :81 @formation_sanitaire_only_required @require_POST
+- `habituels(request)` :92 @formation_sanitaire_only_required
+- `basculer_habituel(request, produit_id)` :125 @formation_sanitaire_only_required @require_POST — L'étoile des fiches produit : ajoute ou retire le produit de la liste.
+- `preremplir_habituels(request)` :139 @formation_sanitaire_only_required @require_POST
+- `programmer_commande(request)` :150 @formation_sanitaire_only_required @require_POST
+
+## commandes (2084 lignes)
 
 ### `commandes/admin.py` (21 l.)
 - *admin* **LigneCommandeInline** :6
@@ -237,25 +308,25 @@
 - URL `<int:commande_id>/supprimer/` -> views.supprimer  `commandes:supprimer` :21
 - URL `<int:commande_id>/` -> views.detail  `commandes:detail` :22
 
-### `commandes/views.py` (401 l.)
+### `commandes/views.py` (411 l.)
 - `panier(request)` :26 @formation_sanitaire_only_required
-- `ajouter(request, produit_id)` :33 @formation_sanitaire_only_required @require_POST
-- `modifier_quantite(request, produit_id)` :73 @formation_sanitaire_only_required @require_POST — Corrige la quantité d'une ligne directement depuis le panier : il fallait
-- `retirer(request, produit_id)` :104 @formation_sanitaire_only_required @require_POST
-- `confirmer(request)` :114 @formation_sanitaire_only_required @require_POST
-- `_lire_quantites(lignes)` :133 — [{"produit": id, "quantite": n}, …] -> {id: n}. Lève ValueError si illisible.
-- `synchroniser_demande(request)` :176 @formation_sanitaire_only_required @require_POST — Reçoit une commande préparée hors connexion (js/demandes.js) et la valide.
-- `historique(request)` :216 @formation_sanitaire_only_required
-- `detail(request, commande_id)` :247 @formation_sanitaire_only_required
-- `telecharger_pdf(request, commande_id)` :257 @formation_sanitaire_only_required — Téléchargement du PDF par la FOSA elle-même (pour l'enregistrer ou le partager,
-- `telecharger_pdf_staff(request, commande_id)` :270 @personnel_frps_required — Téléchargement du PDF par le personnel FRPS (depuis la page notifications),
-- `pdf_commande(request, commande_id, token)` :280 — Sert le PDF de la commande sans authentification : accès protégé par un jeton
-- `supprimer(request, commande_id)` :294 @admin_frps_required @require_POST — Suppression d'une commande par l'admin FRPS, avec remise en stock.
-- `recommander(request, commande_id)` :310 @formation_sanitaire_only_required @require_POST
-- `suivi(request)` :340 @personnel_frps_required — Commandes validées et leur étape de préparation. Par défaut, celles qui ne sont
-- `avancer_etape(request, commande_id)` :386 @stock_frps_required @require_POST
-- *const* `MAX_LIGNES_DEMANDE = 2000` :129
-- *const* `MAX_QUANTITE_DEMANDEE = 10000000` :130
+- `ajouter(request, produit_id)` :39 @formation_sanitaire_only_required @require_POST
+- `modifier_quantite(request, produit_id)` :83 @formation_sanitaire_only_required @require_POST — Corrige la quantité d'une ligne directement depuis le panier : il fallait
+- `retirer(request, produit_id)` :114 @formation_sanitaire_only_required @require_POST
+- `confirmer(request)` :124 @formation_sanitaire_only_required @require_POST
+- `_lire_quantites(lignes)` :143 — [{"produit": id, "quantite": n}, …] -> {id: n}. Lève ValueError si illisible.
+- `synchroniser_demande(request)` :186 @formation_sanitaire_only_required @require_POST — Reçoit une commande préparée hors connexion (js/demandes.js) et la valide.
+- `historique(request)` :226 @formation_sanitaire_only_required
+- `detail(request, commande_id)` :257 @formation_sanitaire_only_required
+- `telecharger_pdf(request, commande_id)` :267 @formation_sanitaire_only_required — Téléchargement du PDF par la FOSA elle-même (pour l'enregistrer ou le partager,
+- `telecharger_pdf_staff(request, commande_id)` :280 @personnel_frps_required — Téléchargement du PDF par le personnel FRPS (depuis la page notifications),
+- `pdf_commande(request, commande_id, token)` :290 — Sert le PDF de la commande sans authentification : accès protégé par un jeton
+- `supprimer(request, commande_id)` :304 @admin_frps_required @require_POST — Suppression d'une commande par l'admin FRPS, avec remise en stock.
+- `recommander(request, commande_id)` :320 @formation_sanitaire_only_required @require_POST
+- `suivi(request)` :350 @personnel_frps_required — Commandes validées et leur étape de préparation. Par défaut, celles qui ne sont
+- `avancer_etape(request, commande_id)` :396 @stock_frps_required @require_POST
+- *const* `MAX_LIGNES_DEMANDE = 2000` :139
+- *const* `MAX_QUANTITE_DEMANDEE = 10000000` :140
 
 ## frps_project (469 lignes)
 
@@ -307,7 +378,7 @@
 - URL `statistiques/` -> include(statistiques.urls) :26
 - URL `reclamations/` -> include(reclamations.urls) :27
 
-## notifications (2419 lignes)
+## notifications (2445 lignes)
 
 ### `notifications/admin.py` (67 l.)
 - *admin* **DestinataireEmailAdmin** :7 — list_editable=actif, recoit_reclamations, recoit_commandes, recoit_rapports
@@ -333,7 +404,7 @@
 - `verifier_statut_livraison_mtn(transaction_id)` :226 — Interroge l'API MTN (GET deliveryStatus) pour connaître le vrai statut de
 - `get_sms_backend()` :273
 
-### `notifications/context_processors.py` (24 l.)
+### `notifications/context_processors.py` (29 l.)
 - `notifications_non_lues(request)` :8 — Expose le nombre de notifications non lues du personnel FRPS connecté,
 
 ### `notifications/emails.py` (231 l.)
@@ -344,23 +415,23 @@
 - `envoyer_email_reclamation(reclamation, rouverte, message)` :154 — Prévient par e-mail les adresses cochées « Réclamations » dans Paramètres.
 - `envoyer_email_test(adresse)` :221 — E-mail d'essai depuis Paramètres : prouve que l'adresse est bonne et que le
 
-### `notifications/models.py` (199 l.)
-- *enum* **TypeEvenement** :5 — NOUVELLE_COMMANDE, PAIEMENT_CONFIRME, COMMANDE_PRETE, RECLAMATION_RESOLUE, RECLAMATION, EMAIL_TEST
-- *enum* **StatutEnvoi** :14 — ENVOYE, ECHEC
-- *modele* **SMSLog** :19
+### `notifications/models.py` (200 l.)
+- *enum* **TypeEvenement** :5 — NOUVELLE_COMMANDE, PAIEMENT_CONFIRME, COMMANDE_PRETE, RECLAMATION_RESOLUE, RECLAMATION, EMAIL_TEST, RETOUR_STOCK
+- *enum* **StatutEnvoi** :15 — ENVOYE, ECHEC
+- *modele* **SMSLog** :20
   - champs : destinataire(Char), message(Text), type_evenement(Char choices=TypeEvenement.choices), statut_envoi(Char choices=StatutEnvoi.choices), commande(ForeignKey ->commandes.Commande related_name=sms_envoyes), date_envoi(DateTime), detail_erreur(Text), reference_externe(Char), statut_livraison(Char), date_statut_livraison(DateTime)
-- *modele* **WhatsAppLog** :52 — Envoi du PDF de la commande validée vers les numéros WhatsApp configurés.
+- *modele* **WhatsAppLog** :53 — Envoi du PDF de la commande validée vers les numéros WhatsApp configurés.
   - champs : destinataire(Char), commande(ForeignKey ->commandes.Commande related_name=whatsapp_envoyes), statut_envoi(Char choices=StatutEnvoi.choices), date_envoi(DateTime), detail_erreur(Text)
-- *modele* **EmailLog** :72 — Envoi d'un email de notification au personnel FRPS, tracé au même titre que
+- *modele* **EmailLog** :73 — Envoi d'un email de notification au personnel FRPS, tracé au même titre que
   - champs : destinataire(Email), sujet(Char), type_evenement(Char choices=TypeEvenement.choices), statut_envoi(Char choices=StatutEnvoi.choices), commande(ForeignKey ->commandes.Commande related_name=emails_envoyes), date_envoi(DateTime), detail_erreur(Text)
-- *modele* **Notification** :97 — Notification interne à l'application, gratuite et immédiate pour le
+- *modele* **Notification** :98 — Notification interne à l'application, gratuite et immédiate pour le
   - champs : role_cible(Char), type_evenement(Char choices=TypeEvenement.choices), message(Text), commande(ForeignKey ->commandes.Commande related_name=notifications_internes), lu(Boolean), date_creation(DateTime)
-- *modele* **PushSubscription** :119 — Abonnement Web Push d'un navigateur/appareil (PWA ou APK installé) pour un
+- *modele* **PushSubscription** :120 — Abonnement Web Push d'un navigateur/appareil (PWA ou APK installé) pour un
   - champs : user(ForeignKey ->settings.AUTH_USER_MODEL related_name=push_subscriptions), endpoint(URL), p256dh(Char), auth(Char), appareil_id(Char), date_creation(DateTime), date_confirmation(DateTime), date_dernier_envoi(DateTime), dernier_statut(Char)
-- *modele* **DestinataireEmail** :166 — Adresse e-mail paramétrée par l'admin FRPS depuis l'application (Paramètres).
+- *modele* **DestinataireEmail** :167 — Adresse e-mail paramétrée par l'admin FRPS depuis l'application (Paramètres).
   - champs : email(Email), nom(Char), actif(Boolean), recoit_commandes(Boolean), recoit_reclamations(Boolean), recoit_rapports(Boolean), date_ajout(DateTime)
-- *classe* **DestinataireEmailQuerySet**(QuerySet) :160
-  - methodes : pour() :161
+- *classe* **DestinataireEmailQuerySet**(QuerySet) :161
+  - methodes : pour() :162
 
 ### `notifications/parametres.py` (45 l.)
 - `ajouter_destinataire(email, nom, envois)` :20
@@ -373,23 +444,24 @@
 - `verifier_token_pdf(commande_id, token)` :29
 - `generer_pdf_commande(commande)` :83 — Génère le PDF récapitulatif d'une commande validée (pour envoi WhatsApp).
 
-### `notifications/push.py` (152 l.)
+### `notifications/push.py` (159 l.)
 - `_vapid()` :35 — py_vapid n'accepte pas directement une chaine PEM (voir Vapid.from_string,
 - `envoyer_push_a_abonnement(abonnement, titre, corps, url)` :41 — Envoie une notification push à UN appareil.
 - `_tracer(abonnement, statut)` :83 — Garde la trace du dernier envoi, affichée dans « Mes appareils ».
 - `envoyer_push_a_utilisateur(user, titre, corps, url)` :110 — Envoie une notification push à tous les appareils abonnés de cet utilisateur.
-- `envoyer_push_aux_utilisateurs(users, titre, corps, url)` :120 — Envoi en tâche de fond : ces notifications partent depuis la requête de
+- `envoyer_push_a_fosa(formation_sanitaire, titre, corps, url)` :120 — Notification à une FOSA (tous les appareils de son compte), en tâche de fond.
+- `envoyer_push_aux_utilisateurs(users, titre, corps, url)` :127 — Envoi en tâche de fond : ces notifications partent depuis la requête de
 - *const* `_PEREMPTION_JOURS = 45` :26
 - *const* `_DELAI_ENVOI_SECONDES = 10` :32
 
-### `notifications/services.py` (248 l.)
+### `notifications/services.py` (257 l.)
 - `_sans_accents(texte)` :17 — Retire les accents pour permettre l'encodage SMS GSM-7 (160 car./segment)
 - `_formatter_lignes_complet(commande)` :91 — Détail complet des produits, sans contrainte de longueur (pour la notification
 - `notifier_nouvelle_commande(commande)` :100
 - `numero_international(numero)` :149 — « 6XX XX XX XX » saisi à la camerounaise → « +2376XXXXXXXX ». Twilio refuse un
 - `notifier_commande_prete(commande)` :165 — SMS à la FOSA quand le personnel stock marque sa commande « prête ».
-- `notifier_paiement_confirme(commande)` :182 — En pause depuis le retrait de l'étape paiement du parcours FOSA (2026-07-26) :
-- `notifier_commande_validee_whatsapp(commande)` :218 — Envoie le PDF de la commande validée aux numéros WhatsApp configurés.
+- `notifier_paiement_confirme(commande)` :191 — En pause depuis le retrait de l'étape paiement du parcours FOSA (2026-07-26) :
+- `notifier_commande_validee_whatsapp(commande)` :227 — Envoie le PDF de la commande validée aux numéros WhatsApp configurés.
 - *const* `_SMS_SEGMENT_MAX = 155` :56
 
 ### `notifications/tests.py` (381 l.)
@@ -424,20 +496,20 @@
 - URL `orange-dr/` -> views.orange_dr_callback  `notifications:orange_dr_callback` :34
 - URL `twilio-dlr/` -> views.twilio_status_callback  `notifications:twilio_status_callback` :35
 
-### `notifications/views.py` (314 l.)
-- `liste(request)` :30 @personnel_frps_required
-- `marquer_lu(request, notification_id)` :44 @personnel_frps_required @require_POST
-- `marquer_tout_lu(request)` :53 @personnel_frps_required @require_POST
-- `enregistrer_abonnement_push(request)` :61 @personnel_frps_required @require_POST — Reçoit l'abonnement Web Push créé côté navigateur (PushManager.subscribe)
-- `tester_abonnement_push(request, abonnement_id)` :105 @personnel_frps_required @require_POST — Envoie une notification de test à UN appareil de l'utilisateur connecté.
-- `supprimer_abonnement_push(request, abonnement_id)` :128 @personnel_frps_required @require_POST
-- `orange_dr_callback(request)` :139 @csrf_exempt @require_POST — Reçoit le Delivery Receipt (DR) envoyé par Orange après l'envoi d'un SMS via
-- `twilio_status_callback(request)` :179 @csrf_exempt @require_POST — Reçoit l'accusé de livraison (DLR) envoyé par Twilio après chaque SMS.
-- `parametres_emails(request)` :213 @admin_frps_required
-- `modifier_destinataire_email(request, destinataire_id)` :264 @admin_frps_required @require_POST
-- `supprimer_destinataire_email(request, destinataire_id)` :279 @admin_frps_required @require_POST
-- `tester_destinataire_email(request, destinataire_id)` :288 @admin_frps_required @require_POST
-- `envoi_email_reel()` :309 — Faux en local (EMAIL_BACKEND_MODE=console, ou tests) : les e-mails sont alors
+### `notifications/views.py` (318 l.)
+- `liste(request)` :31 @personnel_frps_required
+- `marquer_lu(request, notification_id)` :45 @personnel_frps_required @require_POST
+- `marquer_tout_lu(request)` :54 @personnel_frps_required @require_POST
+- `enregistrer_abonnement_push(request)` :62 @login_required @require_POST — Reçoit l'abonnement Web Push créé côté navigateur (PushManager.subscribe)
+- `tester_abonnement_push(request, abonnement_id)` :109 @personnel_frps_required @require_POST — Envoie une notification de test à UN appareil de l'utilisateur connecté.
+- `supprimer_abonnement_push(request, abonnement_id)` :132 @personnel_frps_required @require_POST
+- `orange_dr_callback(request)` :143 @csrf_exempt @require_POST — Reçoit le Delivery Receipt (DR) envoyé par Orange après l'envoi d'un SMS via
+- `twilio_status_callback(request)` :183 @csrf_exempt @require_POST — Reçoit l'accusé de livraison (DLR) envoyé par Twilio après chaque SMS.
+- `parametres_emails(request)` :217 @admin_frps_required
+- `modifier_destinataire_email(request, destinataire_id)` :268 @admin_frps_required @require_POST
+- `supprimer_destinataire_email(request, destinataire_id)` :283 @admin_frps_required @require_POST
+- `tester_destinataire_email(request, destinataire_id)` :292 @admin_frps_required @require_POST
+- `envoi_email_reel()` :313 — Faux en local (EMAIL_BACKEND_MODE=console, ou tests) : les e-mails sont alors
 
 ### `notifications/whatsapp.py` (119 l.)
 - *classe* **WhatsAppBackend**(ABC) :9
@@ -508,7 +580,7 @@
 - `gerer_paiements(request)` :109 @personnel_frps_required — Liste consultable par tout le personnel FRPS (stock inclus, en lecture) ; seule
 - `modifier_paiement(request, commande_id)` :124 @comptabilite_frps_required
 
-## reclamations (842 lignes)
+## reclamations (854 lignes)
 
 ### `reclamations/admin.py` (39 l.)
 - *admin* **MessageReclamationInline** :8
@@ -530,15 +602,15 @@
   - champs : reclamation(ForeignKey ->Reclamation related_name=photos), message(ForeignKey ->MessageReclamation related_name=photos), contenu(Binary), largeur(PositiveInteger), hauteur(PositiveInteger), date(DateTime)
   - methodes : taille_ko() :102
 
-### `reclamations/services.py` (237 l.)
+### `reclamations/services.py` (249 l.)
 - `preparer_photo(fichier)` :25 — Vérifie qu'un fichier envoyé est bien une image et la réduit : grand côté à
 - `_preparer_photos(fichiers)` :60 — Prépare toutes les photos AVANT d'écrire quoi que ce soit : une photo refusée
 - `creer_reclamation(formation_sanitaire, auteur, motif, description, commande, photos)` :83
 - `message_fosa(reclamation, auteur, texte, photos)` :115 — Message de la FOSA. Sur une réclamation résolue, il la rouvre : la FOSA
 - `_envoyer_email(reclamation, rouverte, message)` :148 — Hors transaction et sans jamais lever : la réclamation est enregistrée, un
 - `reponse_frps(reclamation, auteur, texte, statut, photos)` :159 — Réponse et/ou changement de statut par le personnel FRPS. La FOSA est prévenue
-- `marquer_lue(reclamation, par_la_fosa)` :198
-- `_prevenir_personnel(titre, corps, reclamation)` :205 — Push à tout le personnel FRPS actif, comme pour une nouvelle commande.
+- `marquer_lue(reclamation, par_la_fosa)` :210
+- `_prevenir_personnel(titre, corps, reclamation)` :217 — Push à tout le personnel FRPS actif, comme pour une nouvelle commande.
 - *const* `LONGUEUR_MAX_TEXTE = 4000` :14
 - *const* `PHOTOS_MAX_PAR_ENVOI = 3` :18
 - *const* `PIXELS_MAX = 40000000` :20
@@ -626,5 +698,5 @@
 
 ## Gabarits
 
-`templates/accounts/login.html`, `templates/base.html`, `templates/catalogue/_fiche_produit.html`, `templates/catalogue/_liste_promotions.html`, `templates/catalogue/gerer_promotions.html`, `templates/catalogue/importer.html`, `templates/catalogue/liste.html`, `templates/catalogue/promotions.html`, `templates/commandes/_actions_suivi.html`, `templates/commandes/_badge_etape.html`, `templates/commandes/_badge_paiement.html`, `templates/commandes/detail.html`, `templates/commandes/historique.html`, `templates/commandes/panier.html`, `templates/commandes/suivi.html`, `templates/notifications/liste.html`, `templates/notifications/parametres_emails.html`, `templates/paiements/gerer.html`, `templates/paiements/modifier.html`, `templates/paiements/payer.html`, `templates/paiements/succes.html`, `templates/pwa/hors_ligne.html`, `templates/pwa/manifest.webmanifest`, `templates/pwa/sw.js`, `templates/reclamations/_badge_statut.html`, `templates/reclamations/_champ_photos.html`, `templates/reclamations/_photos.html`, `templates/reclamations/detail.html`, `templates/reclamations/liste.html`, `templates/reclamations/nouvelle.html`, `templates/statistiques/index.html`, `templates/statistiques/par_district.html`, `templates/statistiques/par_fosa.html`, `templates/statistiques/par_produit.html`, `templates/statistiques/stock.html`
+`templates/accounts/login.html`, `templates/base.html`, `templates/catalogue/_fiche_produit.html`, `templates/catalogue/_liste_promotions.html`, `templates/catalogue/_liste_ruptures.html`, `templates/catalogue/alertes.html`, `templates/catalogue/gerer_promotions.html`, `templates/catalogue/habituels.html`, `templates/catalogue/importer.html`, `templates/catalogue/liste.html`, `templates/catalogue/promotions.html`, `templates/commandes/_actions_suivi.html`, `templates/commandes/_badge_etape.html`, `templates/commandes/_badge_paiement.html`, `templates/commandes/detail.html`, `templates/commandes/historique.html`, `templates/commandes/panier.html`, `templates/commandes/suivi.html`, `templates/notifications/liste.html`, `templates/notifications/parametres_emails.html`, `templates/paiements/gerer.html`, `templates/paiements/modifier.html`, `templates/paiements/payer.html`, `templates/paiements/succes.html`, `templates/pwa/hors_ligne.html`, `templates/pwa/manifest.webmanifest`, `templates/pwa/sw.js`, `templates/reclamations/_badge_statut.html`, `templates/reclamations/_champ_photos.html`, `templates/reclamations/_photos.html`, `templates/reclamations/detail.html`, `templates/reclamations/liste.html`, `templates/reclamations/nouvelle.html`, `templates/statistiques/index.html`, `templates/statistiques/par_district.html`, `templates/statistiques/par_fosa.html`, `templates/statistiques/par_produit.html`, `templates/statistiques/stock.html`
 

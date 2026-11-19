@@ -260,10 +260,10 @@
 
     // ---------- Catalogue : recherche instantanée ----------
     // Filtre les fiches déjà affichées pendant la frappe, sans recharger la page.
-    // Mêmes règles que le serveur (catalogue/views.py, _mots_recherches et
-    // _nom_contient) : accents et majuscules ignorés, chaque mot cherché à part,
-    // espaces et ponctuation sans effet, « y » lu comme « i ». Toute modification de
-    // ces règles se fait aux deux endroits.
+    // Mêmes règles que le serveur (catalogue/recherche.py) : accents et majuscules
+    // ignorés, chaque mot cherché à part, espaces et ponctuation sans effet, « y » lu
+    // comme « i », lettres doublées fusionnées, une faute tolérée dès 5 lettres,
+    // synonymes. Toute modification de ces règles se fait aux deux endroits.
     (function () {
         var champ = document.getElementById("champ-recherche");
         if (!champ || !String.prototype.normalize) return;
@@ -283,9 +283,50 @@
             lettres = /[a-z0-9À-ɏ]+/g;
         }
 
+        // Lettres doublées fusionnées (« amoxiciline » trouve « amoxicilline »), jamais
+        // les chiffres (« 100 mg » n'est pas « 10 mg »).
+        var doubles;
+        try { doubles = new RegExp("(\\p{L})\\1+", "gu"); } catch (e) { doubles = /([a-zÀ-ɏ])\1+/g; }
+
         function mots(texte) {
             var simplifie = String(texte).trim().toLowerCase().normalize("NFD").replace(marques, "").replace(/y/g, "i");
-            return simplifie.match(lettres) || [];
+            return simplifie.replace(doubles, "$1").match(lettres) || [];
+        }
+
+        // Synonymes fournis par le serveur (catalogue/recherche.py, seule liste).
+        var synonymes = {};
+        try { synonymes = JSON.parse(champ.getAttribute("data-synonymes") || "{}"); } catch (e) { synonymes = {}; }
+
+        function auPlusUneFaute(a, b) {
+            if (Math.abs(a.length - b.length) > 1) return false;
+            if (a.length > b.length) { var t = a; a = b; b = t; }
+            var i = 0, j = 0, fautes = 0;
+            while (i < a.length && j < b.length) {
+                if (a[i] === b[j]) { i++; j++; continue; }
+                fautes++;
+                if (fautes > 1) return false;
+                if (a.length === b.length) i++;
+                j++;
+            }
+            return fautes + (b.length - j) + (a.length - i) <= 1;
+        }
+
+        function motPresent(mot, nom) {
+            if (nom.indexOf(mot) !== -1) return true;
+            if (mot.length < 5) return false;
+            var n = mot.length;
+            for (var debut = 0; debut < nom.length - n + 2; debut++) {
+                for (var longueur = n - 1; longueur <= n + 1; longueur++) {
+                    var morceau = nom.substr(debut, longueur);
+                    if (morceau.length === longueur && auPlusUneFaute(mot, morceau)) return true;
+                }
+            }
+            return false;
+        }
+
+        function correspond(mot, nom) {
+            if (motPresent(mot, nom)) return true;
+            return (synonymes[mot] || []).some(function (syn) { return nom.indexOf(syn) !== -1; });
         }
 
         var fiches = !grille ? [] : Array.prototype.map.call(grille.children, function (colonne) {
@@ -313,7 +354,7 @@
             var saisis = mots(texte);
             var nombre = 0;
             fiches.forEach(function (fiche) {
-                var garde = saisis.every(function (mot) { return fiche.compact.indexOf(mot) !== -1; });
+                var garde = saisis.every(function (mot) { return correspond(mot, fiche.compact); });
                 if (fiche.colonne.hidden === garde) fiche.colonne.hidden = !garde;
                 if (garde) nombre++;
             });

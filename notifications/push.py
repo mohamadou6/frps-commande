@@ -117,6 +117,13 @@ def envoyer_push_a_utilisateur(user, titre, corps, url="/"):
     _envoyer_aux_abonnements(list(user.push_subscriptions.all()), titre, corps, url)
 
 
+def envoyer_push_a_fosa(formation_sanitaire, titre, corps, url="/"):
+    """Notification à une FOSA (tous les appareils de son compte), en tâche de fond.
+    Complète le SMS, ne le remplace pas : beaucoup de FOSA n'auront pas activé les
+    notifications, et le SMS reste la seule voie garantie."""
+    envoyer_push_aux_utilisateurs([formation_sanitaire.user_id], titre, corps, url=url)
+
+
 def envoyer_push_aux_utilisateurs(users, titre, corps, url="/"):
     """Envoi en tâche de fond : ces notifications partent depuis la requête de
     confirmation de commande, et un service de push lent ferait attendre la FOSA

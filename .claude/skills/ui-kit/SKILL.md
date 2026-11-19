@@ -94,9 +94,10 @@ ajouter pour en profiter.
 
 **Catalogue** : `content-visibility: auto` sur les fiches (`.catalogue-grille > .col`) —
 le navigateur ne calcule que les fiches visibles. La **recherche instantanée** (`app.js`)
-reproduit `_mots_recherches` / `_nom_contient` de `catalogue/views.py` : **toute
-modification de ces règles se fait aux deux endroits** (vérifié identique sur les 1 249
-produits du bac à sable le 2026-10-22).
+reproduit `catalogue/recherche.py` (accents, « y » = « i », lettres doublées, une faute dès
+5 lettres, synonymes) : **toute modification de ces règles se fait aux deux endroits**. Les
+synonymes ne sont écrits qu'en Python, la page les transmet (`data-synonymes`). Jusqu'au
+2026-11-19, le serveur ne faisait plus qu'un `icontains` : les deux divergeaient.
 
 **Mobile d'abord.** Toute nouvelle page se vérifie à 375 px de large, en clair et en sombre.
 

@@ -9,6 +9,7 @@ class TypeEvenement(models.TextChoices):
     RECLAMATION_RESOLUE = "reclamation_resolue", "Réclamation résolue (SMS à la FOSA)"
     RECLAMATION = "reclamation", "Réclamation (e-mail au FRPS)"
     EMAIL_TEST = "email_test", "E-mail de test (Paramètres)"
+    RETOUR_STOCK = "retour_stock", "Retour en stock (SMS à la FOSA)"
 
 
 class StatutEnvoi(models.TextChoices):

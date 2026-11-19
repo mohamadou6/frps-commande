@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Mes alertes de stock - Commande FRPS{% endblock %}
+{% block content %}
+<h1 class="h4 app-titre mb-1">🔔 Mes alertes de stock</h1>
+<p class="app-sous-titre text-muted small mb-3">
+    Un produit est en rupture ? Demandez à être prévenu : vous recevrez une notification et un SMS dès son retour.
+</p>
+
+{% if revenus %}
+<section class="mb-4">
+    <h2 class="h6">✅ De retour en stock</h2>
+    <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-3 g-3 catalogue-grille" data-ajout-instantane>
+        {% for produit in revenus %}
+        {% include "catalogue/_fiche_produit.html" %}
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
+
+<section class="mb-4">
+    <h2 class="h6">⏳ En attente <span class="badge bg-body-secondary text-body-secondary">{{ en_attente|length }}</span></h2>
+    {% if en_attente %}
+    <ul class="list-unstyled app-carte p-2 mb-0">
+        {% for alerte in en_attente %}
+        <li class="d-flex flex-wrap align-items-center gap-2 px-2 py-2{% if not forloop.last %} border-bottom{% endif %}">
+            <span class="flex-grow-1 min-w-0">
+                <span class="d-block text-break">{{ alerte.produit.nom }}</span>
+                <span class="small text-muted">Demandée le {{ alerte.date_demande|date:"d/m/Y" }}</span>
+            </span>
+            <form method="post" action="{% url 'catalogue:annuler_alerte' alerte.produit_id %}">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-sm btn-outline-secondary">Annuler</button>
+            </form>
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-muted small">Aucune alerte en attente.</p>
+    {% endif %}
+</section>
+
+<section>
+    <h2 class="h6">🔎 Trouver un produit en rupture</h2>
+    <form method="get" class="d-flex gap-2 mb-2" style="max-width: 520px;">
+        <input type="search" name="q" value="{{ query }}" class="form-control" placeholder="Nom du produit ou molécule...">
+        <button type="submit" class="btn btn-outline-primary">Chercher</button>
+    </form>
+    {% if query %}
+        {% if resultats %}
+        {% include "catalogue/_liste_ruptures.html" with produits=resultats %}
+        {% else %}
+        <p class="text-muted small">Aucun produit en rupture ne correspond à « {{ query }} ». S'il est disponible, il est dans le <a href="{% url 'catalogue:liste' %}?q={{ query|urlencode }}">catalogue</a>.</p>
+        {% endif %}
+    {% endif %}
+</section>
+{% endblock %}

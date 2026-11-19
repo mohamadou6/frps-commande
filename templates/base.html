@@ -71,10 +71,19 @@
                     🏷️ Promotions
                     {% if nb_promotions_menu %}<span class="badge badge-promo">{{ nb_promotions_menu }}</span>{% endif %}
                 </a>
-                <a class="nav-link" href="{% url 'reclamations:liste' %}"{% if ns == "reclamations" %} aria-current="page"{% endif %}>
-                    💬 Réclamations
-                    {% if reclamations_non_lues_count %}<span class="badge bg-danger">{{ reclamations_non_lues_count }}</span>{% endif %}
-                </a>
+                <a class="nav-link" href="{% url 'catalogue:habituels' %}"{% if nom == "habituels" %} aria-current="page"{% endif %}>⭐ <span class="libelle-long">Mes habituels</span><span class="libelle-court">Habituels</span></a>
+                {# Regroupés : la barre de la FOSA débordait dès 1 200 px avec une entrée de plus. #}
+                <div class="dropdown">
+                    <a class="nav-link dropdown-toggle{% if ns == "reclamations" or nom == "alertes" %} actif{% endif %}" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        👤 Mon espace
+                        {% if reclamations_non_lues_count %}<span class="badge bg-danger">{{ reclamations_non_lues_count }}</span>{% endif %}
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-xl-end">
+                        <li><a class="dropdown-item" href="{% url 'catalogue:alertes' %}">🔔 Mes alertes de stock</a></li>
+                        <li><a class="dropdown-item" href="{% url 'catalogue:habituels' %}#commande-mensuelle">📅 Commande mensuelle</a></li>
+                        <li><a class="dropdown-item" href="{% url 'reclamations:liste' %}">💬 Réclamations{% if reclamations_non_lues_count %} <span class="badge bg-danger">{{ reclamations_non_lues_count }}</span>{% endif %}</a></li>
+                    </ul>
+                </div>
                 {% else %}
                 <a class="nav-link doublon-onglets" href="{% url 'statistiques:index' %}"{% if ns == "statistiques" and nom == "index" %} aria-current="page"{% endif %}>📊 <span class="libelle-long">Tableau de bord</span><span class="libelle-court">Tableau</span></a>
                 <a class="nav-link" href="{% url 'commandes:suivi' %}"{% if ns == "commandes" and nom == "suivi" %} aria-current="page"{% endif %}>🚚 Suivi</a>
@@ -213,10 +222,10 @@ et, sur iPhone, aucune proposition automatique n'existe. Piloté par js/app.js.
         </span>
     </div>
 </div>
-{% if user.is_authenticated and not user.is_formation_sanitaire and vapid_public_key %}
+{% if user.is_authenticated and vapid_public_key %}
 <div id="bandeau-notifications" class="container mt-3" hidden>
     <div class="alert alert-info d-flex flex-wrap align-items-center justify-content-between gap-2 mb-0">
-        <span>Activez les notifications : soyez alerté immédiatement des évènements qui vous concernent, même appli fermée.</span>
+        <span>{% if user.is_formation_sanitaire %}Activez les notifications : soyez prévenu quand votre commande est prête, quand un produit revient en stock ou quand le FRPS vous répond, même appli fermée.{% else %}Activez les notifications : soyez alerté immédiatement des évènements qui vous concernent, même appli fermée.{% endif %}</span>
         <span class="text-nowrap">
             <button type="button" class="btn btn-primary btn-sm" id="bouton-activer-notifications">Activer</button>
             <button type="button" class="btn btn-sm btn-link text-secondary" id="bouton-ignorer-notifications">Plus tard</button>
@@ -260,7 +269,7 @@ if ("serviceWorker" in navigator) {
     });
 }
 </script>
-{% if user.is_authenticated and not user.is_formation_sanitaire and vapid_public_key %}
+{% if user.is_authenticated and vapid_public_key %}
 <script>
 // Notifications push : nouvelle commande / paiement reçu, livrées instantanément
 // si l'appareil est en ligne, ou dès la reconnexion sinon (voir notifications/push.py

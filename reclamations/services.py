@@ -187,12 +187,24 @@ def reponse_frps(reclamation, auteur, texte="", statut=None, photos=None):
         reclamation.date_activite = timezone.now()
         reclamation.save(update_fields=list(dict.fromkeys(champs)))
 
+    _prevenir_fosa(reclamation, texte, devient_resolue)
     if devient_resolue:
         try:
             _sms_resolution(reclamation)
         except Exception:  # noqa: BLE001 - un SMS raté ne doit pas annuler la réponse
             logger.exception("Réclamation #%s : SMS de résolution non envoyé", reclamation.pk)
     return reclamation
+
+
+def _prevenir_fosa(reclamation, texte, resolue):
+    from notifications.push import envoyer_push_a_fosa
+
+    titre = f"Réclamation #{reclamation.pk} " + ("résolue" if resolue else ": réponse du FRPS")
+    corps = texte[:120] if texte else f"Statut : {reclamation.get_statut_display()}"
+    try:
+        envoyer_push_a_fosa(reclamation.formation_sanitaire, titre, corps, url=f"/reclamations/{reclamation.pk}/")
+    except Exception:  # noqa: BLE001 - le push ne doit jamais faire échouer la réponse
+        logger.exception("Réclamation #%s : push à la FOSA non envoyé", reclamation.pk)
 
 
 def marquer_lue(reclamation, par_la_fosa):

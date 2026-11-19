@@ -24,8 +24,14 @@ from .models import Commande, EtapeTraitement, StatutCommande
 
 @formation_sanitaire_only_required
 def panier(request):
-    commande = services.get_panier(request.user.formation_sanitaire)
-    return render(request, "commandes/panier.html", {"commande": commande})
+    from catalogue import espace_fosa
+    from catalogue.services import annoter_fiches
+
+    fosa = request.user.formation_sanitaire
+    commande = services.get_panier(fosa)
+    quantites = dict(commande.lignes.values_list("produit_id", "quantite"))
+    suggestions = annoter_fiches(espace_fosa.suggestions(fosa, exclure_ids=list(quantites)), quantites, fosa)
+    return render(request, "commandes/panier.html", {"commande": commande, "suggestions": suggestions})
 
 
 @formation_sanitaire_only_required
@@ -65,6 +71,10 @@ def ajouter(request, produit_id):
         messages.error(request, erreur)
     else:
         messages.success(request, f"{produit.nom} ajouté au panier.")
+    # Retour à la page d'origine (suggestions du panier…), jamais vers l'extérieur.
+    suivant = request.POST.get("suivant", "")
+    if suivant.startswith("/") and not suivant.startswith("//"):
+        return redirect(suivant)
     return redirect("catalogue:liste")
 
 

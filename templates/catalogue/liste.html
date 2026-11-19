@@ -26,7 +26,8 @@ Bandeau d'en-tête : titre, nombre de produits et recherche réunis. Tout en CSS
         <div class="recherche-champ">
             <span class="recherche-icone" aria-hidden="true">🔍</span>
             <input type="search" name="q" value="{{ query }}" placeholder="Rechercher un produit..."
-                   class="form-control" aria-label="Rechercher un produit" id="champ-recherche" autocomplete="off">
+                   class="form-control" aria-label="Rechercher un produit" id="champ-recherche" autocomplete="off"
+                   data-synonymes="{{ synonymes_json }}">
             <kbd class="recherche-raccourci" title="Touche / : aller à la recherche" aria-hidden="true">/</kbd>
         </div>
         <button type="submit" class="btn btn-light btn-rechercher">Rechercher</button>
@@ -76,6 +77,20 @@ Bandeau d'en-tête : titre, nombre de produits et recherche réunis. Tout en CSS
             {% if query %}Aucun produit ne correspond à « {{ query }} ».
             {% elif rayon_actif %}Aucun produit disponible dans ce rayon pour le moment.
             {% else %}Aucun produit synchronisé pour le moment.{% endif %}
+        </p>
+        {% endif %}
+
+        {% if ruptures %}
+        {# Hors de la grille : la recherche instantanée ne doit pas les masquer ni les compter. #}
+        <section class="mt-4" aria-labelledby="titre-ruptures">
+            <h2 class="h6" id="titre-ruptures">🔔 Momentanément indisponibles pour « {{ query }} »</h2>
+            <p class="text-muted small mb-2">Demandez à être prévenu de leur retour en stock (notification et SMS).</p>
+            {% include "catalogue/_liste_ruptures.html" with produits=ruptures %}
+        </section>
+        {% elif query and user.is_formation_sanitaire %}
+        <p class="small text-muted mt-3">
+            Un produit introuvable ? Il est peut-être en rupture :
+            <a href="{% url 'catalogue:alertes' %}?q={{ query|urlencode }}">chercher parmi les produits indisponibles</a>.
         </p>
         {% endif %}
     </div>

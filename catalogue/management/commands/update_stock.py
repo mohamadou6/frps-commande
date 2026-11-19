@@ -3,8 +3,11 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 from django.core.management.base import BaseCommand
+from django.db import transaction
 
+from catalogue.espace_fosa import traiter_retours_en_stock
 from catalogue.models import Produit
+from catalogue.services import noter_baisses_prix
 
 DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
 REF_CSV = DATA_DIR / "produits_magasin_principal.csv"
@@ -104,6 +107,7 @@ class Command(BaseCommand):
         introuvables = 0
         inchanges = 0
         a_modifier = []
+        baisses = []
         for code_sage, (prix, stock) in updates.items():
             produit = produits.get(code_sage)
             if produit is None:
@@ -129,6 +133,9 @@ class Command(BaseCommand):
                 nb_promotions = noter_baisses_prix(baisses)
             if nb_promotions:
                 self.stdout.write(f"{nb_promotions} baisse(s) de prix ajoutée(s) aux Promotions des FOSA.")
+            nb_alertes = traiter_retours_en_stock()
+            if nb_alertes:
+                self.stdout.write(f"{nb_alertes} alerte(s) de retour en stock envoyée(s) aux FOSA.")
 
         verbe = "à modifier (dry-run)" if dry_run else "modifiés"
         self.stdout.write(self.style.SUCCESS(

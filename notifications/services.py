@@ -167,7 +167,16 @@ def notifier_commande_prete(commande):
 
     Numéro de contact de la fiche, sinon celui du compte. Sans numéro, rien ne part :
     c'est journalisé, la FOSA verra l'étape dans l'application."""
+    from .push import envoyer_push_a_fosa
+
     fosa = commande.formation_sanitaire
+    # Push d'abord, indépendamment du numéro : gratuit, et arrive même sans SMS.
+    envoyer_push_a_fosa(
+        fosa,
+        f"Commande #{commande.pk} prête",
+        f"Votre commande de {formater_montant(commande.montant_total)} FCFA est prête.",
+        url=reverse("commandes:detail", args=[commande.pk]),
+    )
     numero = fosa.telephone_contact or fosa.user.telephone
     if not numero:
         logger.warning("Commande #%s prête : %s n'a aucun numéro, SMS non envoyé", commande.pk, fosa.nom)

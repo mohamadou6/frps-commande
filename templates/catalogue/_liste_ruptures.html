@@ -1,0 +1,24 @@
+{# Produits en rupture, avec le bouton pour être prévenu de leur retour (ou l'annuler). #}
+<ul class="list-unstyled app-carte p-2 mb-0">
+    {% for produit in produits %}
+    <li class="d-flex flex-wrap align-items-center gap-2 px-2 py-2{% if not forloop.last %} border-bottom{% endif %}">
+        <span class="flex-grow-1 min-w-0">
+            <span class="d-block text-break">{{ produit.nom }}</span>
+            <span class="small text-muted">{% if produit.rayon %}{{ produit.rayon.icone }} {{ produit.rayon.nom }} · {% endif %}<span class="text-danger">Rupture</span></span>
+        </span>
+        {% if produit.alerte_demandee %}
+        <form method="post" action="{% url 'catalogue:annuler_alerte' produit.id %}">
+            {% csrf_token %}
+            <input type="hidden" name="suivant" value="{{ request.get_full_path }}">
+            <button type="submit" class="btn btn-sm btn-outline-secondary" title="Annuler l'alerte">✓ Alerte demandée</button>
+        </form>
+        {% else %}
+        <form method="post" action="{% url 'catalogue:demander_alerte' produit.id %}">
+            {% csrf_token %}
+            <input type="hidden" name="suivant" value="{{ request.get_full_path }}">
+            <button type="submit" class="btn btn-sm btn-primary">🔔 M'alerter</button>
+        </form>
+        {% endif %}
+    </li>
+    {% endfor %}
+</ul>

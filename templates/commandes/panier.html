@@ -66,4 +66,16 @@
     </form>
     {% endif %}
 </div>
+
+{% if suggestions %}
+{# Sans ajout instantané : la page se recharge pour que le tableau du panier se mette à jour. #}
+<section class="mt-4" aria-labelledby="titre-suggestions">
+    <h2 class="h6" id="titre-suggestions">💡 Vous pourriez aussi avoir besoin de</h2>
+    <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-3 g-3 catalogue-grille">
+        {% for produit in suggestions %}
+        {% include "catalogue/_fiche_produit.html" with retour_ici=True %}
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
 {% endblock %}

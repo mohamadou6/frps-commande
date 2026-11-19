@@ -143,3 +143,67 @@ class Promotion(models.Model):
         if not self.produit.prix_unitaire:
             return 0
         return round((1 - self.prix_promotionnel / self.produit.prix_unitaire) * 100)
+
+
+class AlerteStock(models.Model):
+    """« Prévenez-moi quand c'est disponible » : une FOSA demande à être avertie du
+    retour en stock d'un produit en rupture. Prévenue une seule fois (push + SMS
+    groupés), puis l'alerte reste visible comme « disponible » dans sa page."""
+
+    formation_sanitaire = models.ForeignKey(
+        "accounts.FormationSanitaire", on_delete=models.CASCADE, related_name="alertes_stock"
+    )
+    produit = models.ForeignKey(Produit, on_delete=models.CASCADE, related_name="alertes_stock")
+    date_demande = models.DateTimeField(auto_now_add=True)
+    date_notification = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Alerte de retour en stock"
+        verbose_name_plural = "Alertes de retour en stock"
+        unique_together = ("formation_sanitaire", "produit")
+        ordering = ["-date_demande"]
+
+    def __str__(self):
+        return f"{self.formation_sanitaire.nom} attend {self.produit.nom}"
+
+
+class ProduitHabituel(models.Model):
+    """« Mes produits habituels » : liste personnelle d'une FOSA, avec la quantité
+    qu'elle commande d'ordinaire. Sert aussi de modèle à la commande mensuelle."""
+
+    formation_sanitaire = models.ForeignKey(
+        "accounts.FormationSanitaire", on_delete=models.CASCADE, related_name="produits_habituels"
+    )
+    produit = models.ForeignKey(Produit, on_delete=models.CASCADE, related_name="habituels")
+    quantite = models.PositiveIntegerField(default=1)
+    date_ajout = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Produit habituel"
+        verbose_name_plural = "Produits habituels"
+        unique_together = ("formation_sanitaire", "produit")
+        ordering = ["produit__nom"]
+
+    def __str__(self):
+        return f"{self.formation_sanitaire.nom} : {self.produit.nom} x{self.quantite}"
+
+
+class CommandeMensuelle(models.Model):
+    """Commande programmée : chaque mois, à partir du jour choisi, le panier de la FOSA
+    est préparé avec ses produits habituels. Elle n'a plus qu'à vérifier et valider :
+    rien n'est jamais validé à sa place (le stock serait débité sans elle)."""
+
+    formation_sanitaire = models.OneToOneField(
+        "accounts.FormationSanitaire", on_delete=models.CASCADE, related_name="commande_mensuelle"
+    )
+    jour_du_mois = models.PositiveSmallIntegerField(default=1, help_text="De 1 à 28")
+    active = models.BooleanField(default=True)
+    # Premier jour du mois de la dernière préparation : une seule par mois.
+    dernier_mois_prepare = models.DateField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Commande mensuelle programmée"
+        verbose_name_plural = "Commandes mensuelles programmées"
+
+    def __str__(self):
+        return f"{self.formation_sanitaire.nom} : le {self.jour_du_mois} de chaque mois"

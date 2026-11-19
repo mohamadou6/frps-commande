@@ -1073,6 +1073,9 @@ a.card:hover {
 .bandeau-promotions-lien { margin-left: auto; font-weight: 700; white-space: nowrap; }
 .app-bandeau-promo { background: linear-gradient(120deg, #c2410c, #e8590c 55%, #f08c00); }
 .badge-promo { background: #e8590c; color: #fff; }
+.bouton-habituel { font-size: .8rem; text-decoration: none; color: var(--app-texte-2); }
+.bouton-habituel.actif { color: #b7791f; font-weight: 600; }
+.suggestion-raison { color: var(--app-vert-actif); }
 .liste-suggestions { z-index: 1000; max-height: 320px; overflow-y: auto; display: none; }
 
 /* Laisse un élément flexible rétrécir (sinon text-truncate ne coupe rien). */

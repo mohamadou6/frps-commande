@@ -3,6 +3,7 @@ import logging
 
 from django.conf import settings
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.db.models import Q
 from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -56,12 +57,13 @@ def marquer_tout_lu(request):
     return redirect("notifications:liste")
 
 
-@personnel_frps_required
+@login_required
 @require_POST
 def enregistrer_abonnement_push(request):
     """Reçoit l'abonnement Web Push créé côté navigateur (PushManager.subscribe)
-    et le rattache à l'utilisateur connecté. Réservé au personnel FRPS : les
-    FOSA n'ont pas accès aux notifications push (voir notifications/push.py).
+    et le rattache à l'utilisateur connecté : personnel FRPS et, depuis le
+    2026-11-19, FOSA (commande prête, retour en stock, réponse à une réclamation).
+    Un compte FOSA sans fiche n'a rien à recevoir : refusé.
 
     Le navigateur fait tourner le jeton d'abonnement sans prévenir : sans ménage,
     la base accumulait un abonnement fantôme par rotation, accepté par FCM (201)
@@ -70,6 +72,8 @@ def enregistrer_abonnement_push(request):
     précédent du même appareil, identifié soit par `ancien_endpoint` (envoyé par
     le service worker sur `pushsubscriptionchange`), soit par `appareil_id`
     (identifiant stable stocké dans le localStorage, envoyé par la page)."""
+    if request.user.est_fosa_sans_fiche:
+        return HttpResponse(status=403)
     try:
         payload = json.loads(request.body or b"{}")
         endpoint = payload["endpoint"]

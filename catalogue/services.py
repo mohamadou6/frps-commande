@@ -203,3 +203,35 @@ def nombre_promotions():
     offres, baisses = toutes_les_promotions()
     return len(offres) + len(baisses)
 
+
+
+# ---------- Fiches produit ----------
+
+
+def annoter_fiches(produits, quantites_panier=None, formation_sanitaire=None):
+    """Prépare des produits pour catalogue/_fiche_produit.html : quantité au panier,
+    prix du jour (promotion comprise), étiquettes promotion / baisse, et étoile
+    « produit habituel » quand on connaît la FOSA."""
+    from .models import ProduitHabituel
+
+    quantites_panier = quantites_panier or {}
+    ids = [p.pk for p in produits]
+    promos = prix_promotionnels(ids)
+    baisses = {p.pk: p.pourcentage_baisse for p in baisses_prix_recentes()}
+    habituels = set()
+    if formation_sanitaire is not None:
+        habituels = set(
+            ProduitHabituel.objects.filter(formation_sanitaire=formation_sanitaire, produit_id__in=ids).values_list(
+                "produit_id", flat=True
+            )
+        )
+    for produit in produits:
+        produit.quantite_panier = quantites_panier.get(produit.pk, 0)
+        produit.prix_du_jour = prix_de_vente(produit, promos)
+        produit.en_promotion = produit.pk in promos
+        produit.pourcentage_promotion = (
+            round((1 - produit.prix_du_jour / produit.prix_unitaire) * 100) if produit.en_promotion else None
+        )
+        produit.pourcentage_baisse = baisses.get(produit.pk)
+        produit.est_habituel = produit.pk in habituels
+    return produits
